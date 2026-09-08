@@ -61,6 +61,11 @@ import { StorageImportListView } from '../components/views/StorageImportListView
 import { SEED_STORAGE_IMPORT_GROUPS } from '../data/seed-storage-import';
 import { StorageDateGroup, StorageImportItem } from '../types/storage';
 
+// Menu Adjust Month List View (Chuan qlmn.vn/single/dinhduong/menu_adjust/list)
+import { MenuAdjustListView } from '../components/views/MenuAdjustListView';
+import { SEED_MENU_ADJUST_RECORDS } from '../data/seed-menu-adjust';
+import { MenuAdjustRecord } from '../types/menu-adjust';
+
 // Icons
 import { Sparkles, PlusCircle, FileSpreadsheet, Copy, Lock, Unlock, Printer } from 'lucide-react';
 
@@ -124,6 +129,10 @@ export default function PMSDashboardPage() {
   const [activePmsModule, setActivePmsModule] = useState<PmsSubModule>('nutrition_grid');
   const [isPmsSidebarOpen, setIsPmsSidebarOpen] = useState<boolean>(true);
   const [storageImportGroups, setStorageImportGroups] = useState<StorageDateGroup[]>(SEED_STORAGE_IMPORT_GROUPS);
+
+  // 10. Quản lý Sổ Cân đối khẩu phần theo tháng (Chuẩn qlmn.vn/menu_adjust/list)
+  const [menuAdjustRecords, setMenuAdjustRecords] = useState<MenuAdjustRecord[]>(SEED_MENU_ADJUST_RECORDS);
+  const [menuViewMode, setMenuViewMode] = useState<'list' | 'detail'>('list');
 
   // 6. Modals & Toast
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -676,7 +685,8 @@ export default function PMSDashboardPage() {
       showToast('Đang chuyển đến phân hệ: Quản lý Nhập kho (theo ngày)', 'info');
     } else if (module === 'nutrition_grid') {
       setActiveTab('menu');
-      showToast('Đang chuyển đến phân hệ: Cân đối khẩu phần (Lưới 13 cột)', 'info');
+      setMenuViewMode('list');
+      showToast('Đang chuyển đến: Sổ Cân đối khẩu phần tháng', 'info');
     } else if (module === 'inventory_stock' || module === 'inventory_history' || module === 'warehouse_card') {
       setActiveTab('warehouse');
       showToast('Đang chuyển đến phân hệ: Kho Bán Trú (FIFO)', 'info');
@@ -692,6 +702,29 @@ export default function PMSDashboardPage() {
     } else {
       showToast(`Đã chọn phân hệ: ${module}`, 'info');
     }
+  };
+
+  // 10. Handlers cho Sổ CĐKP tháng
+  const handleEditMenuAdjustRecord = (record: MenuAdjustRecord) => {
+    setSelectedDate(record.rawDate);
+    if (record.targetGroups.includes('Mẫu giáo')) {
+      setCurrentSegment('maugiao');
+    } else if (record.targetGroups.includes('Nhà trẻ')) {
+      setCurrentSegment('nhatre');
+    } else {
+      setCurrentSegment('ansang');
+    }
+    setMenuViewMode('detail');
+    showToast(`Đang mở Lưới 13 cột điều chỉnh ngày ${record.date}`, 'info');
+  };
+
+  const handleAddMenuAdjustRecord = (newRec: Partial<MenuAdjustRecord>) => {
+    showToast(`✓ Đã tạo ngày CĐKP mới: ${newRec.date}`, 'success');
+  };
+
+  const handleDeleteMenuAdjustRecords = (ids: string[]) => {
+    setMenuAdjustRecords((prev) => prev.filter((r) => !ids.includes(r.id)));
+    showToast(`✓ Đã xóa ${ids.length} ngày cân đối khẩu phần`, 'info');
   };
 
   const handleDeleteStorageItem = (id: string) => {
@@ -762,6 +795,15 @@ export default function PMSDashboardPage() {
                 onDeleteItem={handleDeleteStorageItem}
               />
             </div>
+          ) : menuViewMode === 'list' ? (
+            <div className="flex-1 flex overflow-hidden bg-slate-100">
+              <MenuAdjustListView
+                records={menuAdjustRecords}
+                onEditRecord={handleEditMenuAdjustRecord}
+                onAddRecord={handleAddMenuAdjustRecord}
+                onDeleteRecords={handleDeleteMenuAdjustRecords}
+              />
+            </div>
           ) : (
             <>
               {/* Cột Trái: Lịch tuần, Phân hệ, Cây món ăn, KPI Dinh dưỡng (Hỗ trợ thu gọn/mở rộng) */}
@@ -792,6 +834,7 @@ export default function PMSDashboardPage() {
             <main className="flex-1 flex flex-col overflow-hidden bg-white">
               {/* Dải điều khiển tài chính & thao tác hợp nhất siêu gọn chuẩn QLMN */}
               <FinancialSummaryStrip
+                onBackToList={() => setMenuViewMode('list')}
                 schoolName={currentPlan.schoolName}
                 segmentLabel={currentSegment === 'maugiao' ? 'Mẫu giáo' : currentSegment === 'nhatre' ? 'Nhà trẻ' : 'Ăn sáng'}
                 date={selectedDate}

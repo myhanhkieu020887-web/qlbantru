@@ -15,9 +15,11 @@ import {
   Building2,
   Lock,
   GitBranch,
+  ArrowLeft,
 } from 'lucide-react';
 
 interface Props {
+  onBackToList?: () => void;
   schoolName?: string;
   segmentLabel?: string;
   date: string;
@@ -47,6 +49,7 @@ interface Props {
 }
 
 export const FinancialSummaryStrip: React.FC<Props> = ({
+  onBackToList,
   schoolName = 'Trường Mẫu Giáo Hàm Thắng',
   segmentLabel = 'Mẫu giáo',
   date,
@@ -86,6 +89,18 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         {/* Bên trái: Trường, Ngày, Phân hệ, Trạng thái */}
         <div className="flex items-center gap-2 flex-wrap">
+          {onBackToList && (
+            <button
+              type="button"
+              onClick={onBackToList}
+              className="flex items-center gap-1 px-2 py-0.5 rounded bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-semibold text-[11px] shadow-2xs transition-colors cursor-pointer"
+              title="Quay lại Danh sách Sổ Cân đối khẩu phần tháng"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-blue-600" />
+              <span>Sổ CĐKP tháng</span>
+            </button>
+          )}
+
           <span className="font-bold text-slate-800 text-[11px] flex items-center gap-1">
             <Building2 className="w-3.5 h-3.5 text-slate-500" />
             <span>{schoolName}</span>
