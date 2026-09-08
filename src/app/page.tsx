@@ -28,9 +28,24 @@ import { LeftSidebarPanel } from '../components/layout/LeftSidebarPanel';
 import { AttendanceView } from '../components/views/AttendanceView';
 import { SmartPOView } from '../components/views/SmartPOView';
 import { FoodSafetyView } from '../components/views/FoodSafetyView';
+import { WarehouseView } from '../components/views/WarehouseView';
+import { FinanceView } from '../components/views/FinanceView';
 import { NutritionGrid } from '../components/grid/NutritionGrid';
 import { FinancialSummaryStrip } from '../components/grid/FinancialSummaryStrip';
 import { NutritionMatrixFooter } from '../components/metrics/NutritionMatrixFooter';
+
+import {
+  InventoryItem,
+  StockTransaction,
+  SupplierDebtRecord,
+  StudentSettlementC38,
+} from '../types/inventory';
+import {
+  SEED_INVENTORY_ITEMS,
+  SEED_STOCK_TRANSACTIONS,
+  SEED_SUPPLIERS_DEBT,
+  SEED_STUDENT_SETTLEMENTS,
+} from '../data/seed-inventory';
 
 // Modals & Drawers
 import { AddFoodModal } from '../components/dialogs/AddFoodModal';
@@ -87,6 +102,14 @@ export default function PMSDashboardPage() {
   const [isAuditDrawerOpen, setIsAuditDrawerOpen] = useState<boolean>(false);
   const [solverResult, setSolverResult] = useState<SolverResult | null>(null);
   const [isSolving, setIsSolving] = useState<boolean>(false);
+
+  // 7. Quản lý Kho Bán Trú (FIFO)
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(SEED_INVENTORY_ITEMS);
+  const [stockTransactions, setStockTransactions] = useState<StockTransaction[]>(SEED_STOCK_TRANSACTIONS);
+
+  // 8. Quản lý Kế toán Tài chính (C38-HD & 02-TT)
+  const [settlements, setSettlements] = useState<StudentSettlementC38[]>(SEED_STUDENT_SETTLEMENTS);
+  const [suppliersDebt, setSuppliersDebt] = useState<SupplierDebtRecord[]>(SEED_SUPPLIERS_DEBT);
 
   // 6. Modals & Toast
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -296,6 +319,83 @@ export default function PMSDashboardPage() {
     showToast('Đã xóa món ăn khỏi thực đơn', 'info');
   };
 
+  // 7. Thêm giao dịch kho (Nhập / Xuất)
+  const handleAddStockTransaction = (tx: Omit<StockTransaction, 'id' | 'transactionCode'>) => {
+    const newTx: StockTransaction = {
+      ...tx,
+      id: `tx_${Date.now()}`,
+      transactionCode: `${tx.type === 'IMPORT' ? 'NK' : 'XK'}-${Date.now().toString().slice(-6)}`,
+    };
+
+    setStockTransactions((prev) => [newTx, ...prev]);
+
+    // Cập nhật tồn kho và các batches
+    setInventoryItems((prev) =>
+      prev.map((it) => {
+        if (it.foodId !== tx.foodId) return it;
+        if (tx.type === 'IMPORT') {
+          const newBatch = {
+            batchId: `B-${Date.now()}`,
+            batchCode: tx.batchId || `LO-${Date.now().toString().slice(-6)}`,
+            importDate: tx.date,
+            initialQuantity: tx.quantity,
+            remainingQuantity: tx.quantity,
+            unitPrice: tx.unitPrice,
+            expiryDate: '2027-09-01',
+            supplierName: 'Nhà cung cấp mới',
+          };
+          const newStock = it.currentStock + tx.quantity;
+          const newAvg = (it.currentStock * it.averagePrice + tx.totalAmount) / newStock;
+          return {
+            ...it,
+            currentStock: newStock,
+            averagePrice: Math.round(newAvg),
+            batches: [...it.batches, newBatch],
+          };
+        } else {
+          // Xuất kho FIFO
+          let needToDeduct = tx.quantity;
+          const updatedBatches = it.batches.map((b) => {
+            if (needToDeduct <= 0) return b;
+            if (b.remainingQuantity >= needToDeduct) {
+              const res = { ...b, remainingQuantity: b.remainingQuantity - needToDeduct };
+              needToDeduct = 0;
+              return res;
+            } else {
+              needToDeduct -= b.remainingQuantity;
+              return { ...b, remainingQuantity: 0 };
+            }
+          });
+          return {
+            ...it,
+            currentStock: Math.max(0, it.currentStock - tx.quantity),
+            batches: updatedBatches,
+          };
+        }
+      })
+    );
+
+    showToast(`✓ Đã ghi nhận phiếu ${newTx.transactionCode} thành công!`, 'success');
+  };
+
+  // 8. Ghi nhận thanh toán công nợ NCC
+  const handleRecordSupplierPayment = (supplierId: string, amount: number) => {
+    setSuppliersDebt((prev) =>
+      prev.map((sup) => {
+        if (sup.supplierId !== supplierId) return sup;
+        const newPaid = sup.periodPayments + amount;
+        const newClosing = Math.max(0, sup.closingBalance - amount);
+        return {
+          ...sup,
+          periodPayments: newPaid,
+          closingBalance: newClosing,
+          status: newClosing === 0 ? 'RECONCILED' : 'PENDING_PAYMENT',
+        };
+      })
+    );
+    showToast(`✓ Đã ghi nhận thanh toán ${formatCurrency(amount)} cho nhà cung cấp!`, 'success');
+  };
+
   // Thêm thực phẩm từ CSDL chuẩn
   const handleAddFood = (food: FoodItem, session: MealSession, gam: number) => {
     const newItem: MenuItem = {
@@ -345,6 +445,36 @@ export default function PMSDashboardPage() {
       approvedAt: newStatus === 'APPROVED' ? new Date().toLocaleString('vi-VN') : prev.approvedAt,
     }));
     showToast(`Đã chuyển trạng thái sang [${newStatus}]`, 'info');
+
+    // Tự động xuất kho FIFO các mặt hàng khô/gia vị/gạo khi thực đơn được DUYỆT hoặc KHÓA SỔ
+    if (newStatus === 'APPROVED' || newStatus === 'LOCKED') {
+      let exportedCount = 0;
+      computedItems.forEach((cItem) => {
+        const inv = inventoryItems.find(
+          (it) => it.foodName.toLowerCase() === cItem.food.name.toLowerCase()
+        );
+        if (inv && cItem.actualBuyUnit > 0) {
+          handleAddStockTransaction({
+            date: currentPlan.date,
+            type: 'EXPORT_MENU',
+            foodId: inv.foodId,
+            foodName: inv.foodName,
+            unit: inv.unit,
+            quantity: cItem.actualBuyUnit,
+            unitPrice: inv.averagePrice,
+            totalAmount: cItem.actualBuyUnit * inv.averagePrice,
+            menuDate: currentPlan.date,
+            reason: `Xuất kho tự động theo thực đơn ${currentPlan.date} (${newStatus})`,
+            performer: 'Hệ thống tự động (FIFO)',
+          });
+          exportedCount++;
+        }
+      });
+      if (exportedCount > 0) {
+        showToast(`✓ Đã tự động xuất kho FIFO ${exportedCount} mặt hàng khô/gia vị cho thực đơn!`, 'success');
+      }
+    }
+
     triggerCloudSync();
   };
 
@@ -643,6 +773,25 @@ export default function PMSDashboardPage() {
               showToast(`✓ ĐÃ MỞ KHÓA CHIA ĂN SỐ! Mã lưu mẫu: ${record.step3.sealCode}`, 'success');
             }}
             onShowToast={showToast}
+          />
+        )}
+
+        {/* VIEW 5: QUẢN LÝ KHO BÁN TRÚ (FIFO) */}
+        {activeTab === 'warehouse' && (
+          <WarehouseView
+            inventoryItems={inventoryItems}
+            transactions={stockTransactions}
+            onAddStockTransaction={handleAddStockTransaction}
+            canManageWarehouse={rolePerm.canEditNutrients}
+          />
+        )}
+
+        {/* VIEW 6: KẾ TOÁN TÀI CHÍNH (C38-HD & 02-TT) */}
+        {activeTab === 'finance' && (
+          <FinanceView
+            settlements={settlements}
+            suppliersDebt={suppliersDebt}
+            onRecordSupplierPayment={handleRecordSupplierPayment}
           />
         )}
       </div>

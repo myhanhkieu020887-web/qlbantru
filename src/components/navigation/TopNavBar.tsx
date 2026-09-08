@@ -1,13 +1,13 @@
 'use client';
 
 import React from 'react';
-import { Utensils, BarChart3, Users, Truck, ShieldCheck, Sparkles, FileSpreadsheet } from 'lucide-react';
+import { Utensils, BarChart3, Users, Truck, ShieldCheck, Sparkles, FileSpreadsheet, Warehouse, ReceiptText } from 'lucide-react';
 import { UserRole } from '@/types/auth';
 import { SyncStatus } from '@/lib/supabase/client';
 import { RoleSwitcher } from './RoleSwitcher';
 import { CloudSyncIndicator } from './CloudSyncIndicator';
 
-export type AppTab = 'menu' | 'attendance' | 'smart_po' | 'food_safety';
+export type AppTab = 'menu' | 'attendance' | 'smart_po' | 'food_safety' | 'warehouse' | 'finance';
 
 interface TopNavBarProps {
   activeTab: AppTab;
@@ -112,6 +112,32 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               isDistributionUnlocked ? 'bg-emerald-500' : 'bg-amber-400 animate-pulse'
             }`}
           />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onTabChange('warehouse')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+            activeTab === 'warehouse'
+              ? 'bg-white text-emerald-700 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+          }`}
+        >
+          <Warehouse className="w-3.5 h-3.5" />
+          <span>Quản lý Kho</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onTabChange('finance')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+            activeTab === 'finance'
+              ? 'bg-white text-blue-700 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+          }`}
+        >
+          <ReceiptText className="w-3.5 h-3.5" />
+          <span>Kế toán Tài chính</span>
         </button>
       </nav>
 
