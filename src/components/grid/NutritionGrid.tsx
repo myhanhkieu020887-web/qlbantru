@@ -109,33 +109,33 @@ export const NutritionGrid: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* BẢNG DỮ LIỆU CHÍNH (13 CỘT QLMN) */}
+      {/* BẢNG DỮ LIỆU CHÍNH (13 CỘT QLMN - COMPACT MODE) */}
       <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse text-xs text-left">
-          <thead className="sticky top-0 bg-[#e8eef8] text-slate-800 z-10 shadow-xs border-b border-slate-300 font-bold text-[11px]">
+          <thead className="sticky top-0 bg-[#e8eef8] text-slate-800 z-10 shadow-xs border-b border-slate-300 font-bold text-[10.5px]">
             <tr>
-              <th className="py-2 px-1 text-center border-r border-slate-300 w-9">STT</th>
-              <th className="py-2 px-1.5 text-center border-r border-slate-300 w-16">Mã TP</th>
-              <th className="py-2 px-3 border-r border-slate-300 min-w-[190px]">Tên thực phẩm</th>
-              <th className="py-2 px-2 border-r border-slate-300 w-20 text-right bg-blue-100/70 text-blue-950 font-black">
-                Lượng ăn (g)
+              <th className="py-1 px-1 text-center border-r border-slate-300 w-8">STT</th>
+              <th className="py-1 px-1 text-center border-r border-slate-300 w-13">Mã TP</th>
+              <th className="py-1 px-2 border-r border-slate-300 min-w-[160px]">Tên thực phẩm</th>
+              <th className="py-1 px-1.5 border-r border-slate-300 w-16 text-right bg-blue-100/70 text-blue-950 font-black">
+                Lượng (g)
               </th>
-              <th className="py-2 px-2 border-r border-slate-300 w-20 text-right">Thực ăn (kg)</th>
-              <th className="py-2 px-1 text-center border-r border-slate-300 w-14">Thải bỏ (%)</th>
-              <th className="py-2 px-2 border-r border-slate-300 w-20 text-right font-bold text-slate-900">Thực mua (kg)</th>
-              <th className="py-2 px-2 text-center border-r border-slate-300 w-16">ĐVT</th>
-              <th className="py-2 px-1.5 text-right border-r border-slate-300 w-16 font-mono text-slate-500">Quy đổi</th>
-              <th className="py-2 px-2 border-r border-slate-300 w-20 text-right">Đơn giá (đ)</th>
-              <th className="py-2 px-2 border-r border-slate-300 w-24 text-right bg-amber-50 text-amber-950 font-black">
+              <th className="py-1 px-1.5 border-r border-slate-300 w-16 text-right">Ăn (kg)</th>
+              <th className="py-1 px-1 text-center border-r border-slate-300 w-12">Thải %</th>
+              <th className="py-1 px-1.5 border-r border-slate-300 w-16 text-right font-bold text-slate-900">Mua (kg)</th>
+              <th className="py-1 px-1 text-center border-r border-slate-300 w-10">ĐVT</th>
+              <th className="py-1 px-1 text-right border-r border-slate-300 w-13 font-mono text-slate-500 text-[10px]">Quy đổi</th>
+              <th className="py-1 px-1.5 border-r border-slate-300 w-16 text-right">Đơn giá</th>
+              <th className="py-1 px-1.5 border-r border-slate-300 w-20 text-right bg-amber-50 text-amber-950 font-black">
                 Thành tiền (đ)
               </th>
-              <th className="py-2 px-2 border-r border-slate-300 w-16 text-right text-rose-700">Đạm P</th>
-              <th className="py-2 px-2 border-r border-slate-300 w-16 text-right text-amber-700">Béo L</th>
-              <th className="py-2 px-2 border-r border-slate-300 w-16 text-right text-emerald-700">Đường G</th>
-              <th className="py-2 px-2 border-r border-slate-300 w-16 text-right bg-orange-50 text-orange-950 font-black">
+              <th className="py-1 px-1 text-right border-r border-slate-300 w-12 text-rose-700">Đạm P</th>
+              <th className="py-1 px-1 text-right border-r border-slate-300 w-12 text-amber-700">Béo L</th>
+              <th className="py-1 px-1 text-right border-r border-slate-300 w-12 text-emerald-700">Đường G</th>
+              <th className="py-1 px-1.5 border-r border-slate-300 w-13 text-right bg-orange-50 text-orange-950 font-black">
                 Calo
               </th>
-              <th className="py-2 px-1 text-center w-14">Thao tác</th>
+              <th className="py-1 px-0.5 text-center w-11">Khóa/Xóa</th>
             </tr>
           </thead>
 

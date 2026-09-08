@@ -2,19 +2,30 @@
 
 import React from 'react';
 import { formatCurrency, formatNumber } from '../../lib/utils';
+import { MenuStatus } from '../../types/nutrition';
 import {
   Calendar,
   Save,
   Printer,
   BookmarkPlus,
+  PlusCircle,
+  Copy,
   Info,
   DollarSign,
   Users,
+  Building2,
+  Lock,
 } from 'lucide-react';
 
 interface Props {
+  schoolName?: string;
+  segmentLabel?: string;
   date: string;
   onDateChange: (d: string) => void;
+  status: MenuStatus;
+  onStatusChange: (s: MenuStatus) => void;
+  canApproveMenu?: boolean;
+  canLockMenu?: boolean;
   studentCount: number;
   onStudentCountChange: (count: number) => void;
   mealPricePerChild: number;
@@ -23,15 +34,24 @@ interface Props {
   subsidyFee?: number;
   initialDifference?: number;
   totalCost: number;
+  onAddFood?: () => void;
+  onCopyZalo?: () => void;
   onSave?: () => void;
   onPrint?: () => void;
   onSaveTemplate?: () => void;
   isLocked?: boolean;
+  canEditNutrients?: boolean;
 }
 
 export const FinancialSummaryStrip: React.FC<Props> = ({
+  schoolName = 'Trường Mẫu Giáo Hàm Thắng',
+  segmentLabel = 'Mẫu giáo',
   date,
   onDateChange,
+  status,
+  onStatusChange,
+  canApproveMenu = true,
+  canLockMenu = true,
   studentCount,
   onStudentCountChange,
   mealPricePerChild,
@@ -40,10 +60,13 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
   subsidyFee = 0,
   initialDifference = 0,
   totalCost,
+  onAddFood,
+  onCopyZalo,
   onSave,
   onPrint,
   onSaveTemplate,
   isLocked = false,
+  canEditNutrients = true,
 }) => {
   // Tính toán kế toán chuẩn QLMN
   const totalRevenue = studentCount * mealPricePerChild;
@@ -52,58 +75,84 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
   const differencePerChild = studentCount > 0 ? totalDifference / studentCount : 0;
 
   return (
-    <div className="bg-[#f5fbf2] border-b border-[#c8e2bd] px-4 py-2.5 text-xs text-slate-800 select-none shrink-0 shadow-xs">
-      <div className="flex flex-wrap items-center justify-between gap-y-2">
-        {/* CỘT 1: NGÀY LẬP & SĨ SỐ */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5 font-bold text-[#2e7d32]">
-            <Calendar className="w-4 h-4 text-[#4caf50]" />
-            <span>Ngày lập:</span>
+    <div className="bg-[#f7faf5] border-b border-[#c8e2bd] px-3 py-1.5 text-xs text-slate-800 select-none shrink-0 shadow-xs space-y-1">
+      {/* HÀNG 1: TÊN ĐƠN VỊ, TRẠNG THÁI & CỤM NÚT HÀNH ĐỘNG */}
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        {/* Bên trái: Trường, Ngày, Phân hệ, Trạng thái */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-bold text-slate-800 text-[11px] flex items-center gap-1">
+            <Building2 className="w-3.5 h-3.5 text-slate-500" />
+            <span>{schoolName}</span>
+          </span>
+          <span className="text-slate-300">|</span>
+
+          {/* Ngày lập */}
+          <div className="flex items-center gap-1">
+            <span className="text-slate-500 text-[11px]">Ngày:</span>
             <input
               type="date"
               value={date}
               onChange={(e) => onDateChange(e.target.value)}
               disabled={isLocked}
-              className="bg-white border border-[#c8e2bd] rounded px-2 py-0.5 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#4caf50]"
+              className="bg-white border border-slate-300 rounded px-1.5 py-0.2 text-[11px] font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-600 font-medium">Số trẻ:</span>
-            <input
-              type="number"
-              value={studentCount}
-              onChange={(e) => onStudentCountChange(Math.max(0, parseInt(e.target.value) || 0))}
-              disabled={isLocked}
-              className="w-16 bg-white border border-[#c8e2bd] rounded px-2 py-0.5 text-xs font-mono font-bold text-slate-900 text-right focus:outline-none focus:ring-1 focus:ring-[#4caf50]"
-            />
-            <span className="text-[11px] text-slate-500 font-mono">cháu</span>
-          </div>
+          <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-blue-50 text-blue-700 border border-blue-200">
+            {segmentLabel}
+          </span>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-600 font-medium">Tiền 1 trẻ:</span>
-            <input
-              type="number"
-              value={mealPricePerChild}
-              onChange={(e) => onMealPriceChange(Math.max(0, parseInt(e.target.value) || 0))}
-              disabled={isLocked}
-              step={1000}
-              className="w-24 bg-white border border-[#c8e2bd] rounded px-2 py-0.5 text-xs font-mono font-bold text-slate-900 text-right focus:outline-none focus:ring-1 focus:ring-[#4caf50]"
-            />
-            <span className="text-[11px] text-slate-500">VNĐ</span>
+          {/* Trạng thái phê duyệt */}
+          <div className="flex items-center gap-1">
+            <select
+              value={status}
+              onChange={(e) => onStatusChange(e.target.value as MenuStatus)}
+              className="font-semibold text-[11px] bg-white border border-slate-300 rounded px-1.5 py-0.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="DRAFT">📝 Bản nháp</option>
+              <option value="OPTIMIZED">⚡ Đã cân đối</option>
+              <option value="APPROVED" disabled={!canApproveMenu}>✓ BGH Duyệt</option>
+              <option value="LOCKED" disabled={!canLockMenu}>🔒 Khóa sổ</option>
+            </select>
           </div>
         </div>
 
-        {/* NÚT TÁC VỤ BÊN PHẢI CHUẨN QLMN */}
-        <div className="flex items-center gap-2">
+        {/* Bên phải: Cụm nút hành động nhanh */}
+        <div className="flex items-center gap-1.5">
+          {onAddFood && (
+            <button
+              type="button"
+              onClick={onAddFood}
+              disabled={isLocked || !canEditNutrients}
+              className={`flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded border shadow-xs transition-all ${
+                isLocked || !canEditNutrients
+                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                  : 'bg-white border-slate-300 hover:bg-slate-50 text-slate-700'
+              }`}
+            >
+              <PlusCircle className="w-3 h-3 text-blue-600" />
+              <span>+ Thêm TP</span>
+            </button>
+          )}
+
+          {onCopyZalo && (
+            <button
+              type="button"
+              onClick={onCopyZalo}
+              className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded border border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100 shadow-xs transition-all"
+            >
+              <Copy className="w-3 h-3 text-blue-600" />
+              <span>Sao chép Zalo</span>
+            </button>
+          )}
+
           {onSave && (
             <button
               type="button"
               onClick={onSave}
-              className="flex items-center gap-1 bg-[#2e7d32] hover:bg-[#1b5e20] text-white px-3 py-1 rounded text-xs font-bold shadow-xs transition"
-              title="Lưu thực đơn"
+              className="flex items-center gap-1 bg-[#2e7d32] hover:bg-[#1b5e20] text-white px-2.5 py-0.5 rounded text-[11px] font-bold shadow-xs transition"
             >
-              <Save className="w-3.5 h-3.5" />
+              <Save className="w-3 h-3" />
               <span>Lưu</span>
             </button>
           )}
@@ -112,10 +161,9 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
             <button
               type="button"
               onClick={onPrint}
-              className="flex items-center gap-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded text-xs font-semibold shadow-xs transition"
-              title="In thực đơn A4"
+              className="flex items-center gap-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-2 py-0.5 rounded text-[11px] font-semibold shadow-xs transition"
             >
-              <Printer className="w-3.5 h-3.5 text-slate-500" />
+              <Printer className="w-3 h-3 text-slate-500" />
               <span>In</span>
             </button>
           )}
@@ -124,77 +172,68 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
             <button
               type="button"
               onClick={onSaveTemplate}
-              className="flex items-center gap-1 bg-[#689f38] hover:bg-[#558b2f] text-white px-3 py-1 rounded text-xs font-bold shadow-xs transition"
-              title="Lưu làm thực đơn mẫu"
+              className="flex items-center gap-1 bg-[#43a047] hover:bg-[#2e7d32] text-white px-2 py-0.5 rounded text-[11px] font-semibold shadow-xs transition"
             >
-              <BookmarkPlus className="w-3.5 h-3.5" />
-              <span>Lưu thực đơn mẫu</span>
+              <BookmarkPlus className="w-3 h-3" />
+              <span>Mẫu</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* DÒNG 2 & 3: BẢNG KẾ TOÁN THU - CHI - CHÊNH LỆCH */}
-      <div className="mt-2 pt-2 border-t border-[#dcedd8] grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-[11px]">
-        {/* 1. Tổng tiền thu */}
-        <div className="bg-white/80 rounded border border-[#dcedd8] p-1.5">
-          <div className="text-slate-500 font-medium">Tổng tiền thu:</div>
-          <div className="font-mono font-bold text-slate-900 text-xs">
-            {formatCurrency(totalRevenue)}
+      {/* HÀNG 2: BẢNG DÒNG CHỈ SỐ KẾ TOÁN TIẾP PHẨM SIÊU MỎNG */}
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-1 border-t border-[#dbeef0] text-[11px]">
+        {/* Sĩ số và mức tiền */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+            <span className="text-slate-600 font-medium">Số trẻ:</span>
+            <input
+              type="number"
+              value={studentCount}
+              onChange={(e) => onStudentCountChange(Math.max(0, parseInt(e.target.value) || 0))}
+              disabled={isLocked}
+              className="w-14 bg-white border border-[#c8e2bd] rounded px-1 py-0.2 text-[11px] font-mono font-bold text-slate-900 text-center focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+            <span className="text-[10px] text-slate-400">cháu</span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <span className="text-slate-600 font-medium">Tiền 1 trẻ:</span>
+            <input
+              type="number"
+              value={mealPricePerChild}
+              onChange={(e) => onMealPriceChange(Math.max(0, parseInt(e.target.value) || 0))}
+              disabled={isLocked}
+              step={1000}
+              className="w-18 bg-white border border-[#c8e2bd] rounded px-1.5 py-0.2 text-[11px] font-mono font-bold text-slate-900 text-right focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+            <span className="text-[10px] text-slate-400">đ</span>
           </div>
         </div>
 
-        {/* 2. Tiền dịch vụ */}
-        <div className="bg-white/80 rounded border border-[#dcedd8] p-1.5">
-          <div className="text-slate-500 font-medium">Tiền dịch vụ:</div>
-          <div className="font-mono font-bold text-slate-700 text-xs">
-            {formatCurrency(serviceFee)}
+        {/* Các chỉ số tài chính */}
+        <div className="flex items-center gap-3 font-mono">
+          <div>
+            <span className="text-slate-500 text-[10px]">Tổng thu: </span>
+            <strong className="text-slate-900">{totalRevenue.toLocaleString('vi-VN')} đ</strong>
           </div>
-        </div>
 
-        {/* 3. Tiền bổ trợ */}
-        <div className="bg-white/80 rounded border border-[#dcedd8] p-1.5">
-          <div className="text-slate-500 font-medium">Tiền ăn bổ trợ:</div>
-          <div className="font-mono font-bold text-slate-700 text-xs">
-            {formatCurrency(subsidyFee)}
+          <div>
+            <span className="text-slate-500 text-[10px]">Tiền ăn: </span>
+            <strong className="text-emerald-700 font-bold">{Math.round(totalCost).toLocaleString('vi-VN')} đ</strong>
           </div>
-        </div>
 
-        {/* 4. Tổng tiền ăn thực tế */}
-        <div className="bg-white/80 rounded border border-[#dcedd8] p-1.5">
-          <div className="text-slate-500 font-medium">Tổng tiền ăn:</div>
-          <div className="font-mono font-bold text-[#1b5e20] text-xs">
-            {formatNumber(totalCost, 1)} đ
+          <div>
+            <span className="text-slate-500 text-[10px]">BQ/trẻ: </span>
+            <span className="font-semibold text-slate-700">{formatNumber(costPerChild, 0)} đ</span>
           </div>
-        </div>
 
-        {/* 5. Tiền chênh lệch 1 trẻ */}
-        <div className="bg-white/80 rounded border border-[#dcedd8] p-1.5">
-          <div className="flex items-center gap-1 text-slate-500 font-medium">
-            <span>Tiền chênh lệch 1 trẻ:</span>
-            <Info className="w-3 h-3 text-amber-500" />
-          </div>
-          <div
-            className={`font-mono font-bold text-xs ${
-              differencePerChild >= 0 ? 'text-[#e65100]' : 'text-rose-600'
-            }`}
-          >
-            {formatNumber(differencePerChild, 2)} đ
-          </div>
-        </div>
-
-        {/* 6. Tổng tiền chênh lệch */}
-        <div className="bg-white/80 rounded border border-[#dcedd8] p-1.5">
-          <div className="flex items-center gap-1 text-slate-500 font-medium">
-            <span>Tổng tiền chênh lệch:</span>
-            <Info className="w-3 h-3 text-amber-500" />
-          </div>
-          <div
-            className={`font-mono font-bold text-xs ${
-              totalDifference >= 0 ? 'text-[#e65100]' : 'text-rose-600'
-            }`}
-          >
-            {formatNumber(totalDifference, 1)} đ
+          <div className="flex items-center gap-1 pl-2 border-l border-slate-200">
+            <span className="text-slate-500 text-[10px]">Chênh lệch: </span>
+            <strong className={`font-bold ${totalDifference >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+              {totalDifference >= 0 ? '+' : ''}{Math.round(totalDifference).toLocaleString('vi-VN')} đ
+            </strong>
+            <span className="text-[10px] text-slate-400">({totalDifference >= 0 ? '+' : ''}{formatNumber(differencePerChild, 0)}đ/trẻ)</span>
           </div>
         </div>
       </div>

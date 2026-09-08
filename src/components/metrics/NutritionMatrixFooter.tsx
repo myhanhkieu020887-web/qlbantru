@@ -9,7 +9,7 @@ import {
 } from '../../types/nutrition';
 import { evaluateMealCaloDistribution } from '../../engine/atwater';
 import { formatCurrency, formatNumber } from '../../lib/utils';
-import { RefreshCw, Info, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, Info, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Sparkles } from 'lucide-react';
 
 interface Props {
   computedItems: ComputedMenuItem[];
@@ -26,6 +26,7 @@ export const NutritionMatrixFooter: React.FC<Props> = ({
   onRunSolver,
   isSolving = false,
 }) => {
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [includeBreakfast, setIncludeBreakfast] = useState<boolean>(false);
   const isMauGiao = ageGroup === 'maugiao';
 
@@ -63,8 +64,94 @@ export const NutritionMatrixFooter: React.FC<Props> = ({
   const isQuantityPass = totals.isCaloPass;
   const isQualityPass = totals.isRatioPass && totals.isAnimalProteinPass && totals.isPlantFatPass;
 
+  // NẾU ĐANG THU GỌN: Render Thanh Tóm Tắt Dinh Dưỡng Siêu Mỏng (Sticky 36px)
+  if (!isExpanded) {
+    return (
+      <div className="border-t-2 border-[#81c784] bg-[#f9fdf8] px-3 py-1.5 text-xs select-none shrink-0 shadow-md flex items-center justify-between">
+        {/* Bên trái: Nút mở rộng + Đánh giá Lượng/Chất */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsExpanded(true)}
+            className="flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 px-2 py-0.5 rounded transition"
+            title="Mở rộng bảng ma trận dinh dưỡng 7 dòng và phân bổ calo"
+          >
+            <ChevronUp className="w-3.5 h-3.5" />
+            <span>Ma trận dinh dưỡng</span>
+          </button>
+
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="text-slate-500">Lượng:</span>
+            <strong className={isQuantityPass ? 'text-emerald-700' : 'text-rose-600'}>
+              {isQuantityPass ? '✓ Đạt' : '● Chưa đạt'}
+            </strong>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-500">Chất:</span>
+            <strong className={isQualityPass ? 'text-emerald-700' : 'text-rose-600'}>
+              {isQualityPass ? '✓ Cân đối' : '● Cần chỉnh'}
+            </strong>
+          </div>
+        </div>
+
+        {/* Ở giữa: Calo & Cơ cấu P-L-G */}
+        <div className="flex items-center gap-4 text-[11px] font-mono">
+          <div>
+            <span className="text-slate-500 font-sans text-[10px]">Năng lượng: </span>
+            <strong className="text-orange-900 font-black">{formatNumber(totals.totalCalo, 1)} Kcal</strong>
+            <span className="text-slate-400 font-sans text-[10px]"> (615 - 738)</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 pl-3 border-l border-slate-200">
+            <span className="text-slate-500 font-sans text-[10px]">Tỷ lệ P:L:G: </span>
+            <span className="text-rose-700 font-bold">{totals.proteinPct.toFixed(1)}% P</span>
+            <span>:</span>
+            <span className="text-amber-700 font-bold">{totals.fatPct.toFixed(1)}% L</span>
+            <span>:</span>
+            <span className="text-emerald-700 font-bold">{totals.carbsPct.toFixed(1)}% G</span>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-slate-200 text-[10px] text-slate-500 font-sans">
+            <span>Đạm ĐV: <strong className="font-mono text-slate-800">{totals.animalProteinRatio.toFixed(1)}%</strong></span>
+            <span>Béo TV: <strong className="font-mono text-slate-800">{totals.plantFatRatio.toFixed(1)}%</strong></span>
+          </div>
+        </div>
+
+        {/* Bên phải: Nút Cân đối thực đơn */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onRunSolver}
+            disabled={isSolving}
+            className="flex items-center gap-1 bg-[#f57c00] hover:bg-[#e65100] text-white py-1 px-2.5 rounded font-bold text-[11px] shadow-xs transition active:scale-95 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3 h-3 ${isSolving ? 'animate-spin' : ''}`} />
+            <span>{isSolving ? 'Đang cân đối...' : 'Cân đối thực đơn'}</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // TRẠNG THÁI MỞ RỘNG (EXPANDED):
   return (
-    <div className="border-t-2 border-[#81c784] bg-[#f9fdf8] p-3 text-xs select-none shrink-0 shadow-lg">
+    <div className="border-t-2 border-[#81c784] bg-[#f9fdf8] p-2.5 text-xs select-none shrink-0 shadow-lg relative">
+      {/* NÚT THU GỌN Ở GÓC TRÊN CÙNG */}
+      <div className="flex items-center justify-between mb-2 pb-1 border-b border-[#c8e2bd]">
+        <div className="flex items-center gap-2 font-bold text-slate-800 text-xs">
+          <span className="text-emerald-800">📊 MA TRẬN ĐÁNH GIÁ LƯỢNG & CHẤT CHI TIẾT</span>
+          <span className="text-[10px] font-normal text-slate-500">(Theo Thông tư 51/2020 & QĐ 2195)</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsExpanded(false)}
+          className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-slate-900 bg-white border border-slate-300 hover:bg-slate-50 px-2 py-0.5 rounded transition"
+          title="Thu gọn ma trận để xem nhiều dòng thực phẩm hơn"
+        >
+          <ChevronDown className="w-3.5 h-3.5" />
+          <span>Thu gọn chân trang</span>
+        </button>
+      </div>
+
       <div className="flex flex-col lg:flex-row gap-3 items-stretch justify-between">
         {/* KHỐI TRÁI: ĐÁNH GIÁ LƯỢNG / CHẤT & NÚT CÂN ĐỐI */}
         <div className="w-full lg:w-48 shrink-0 flex flex-col justify-between border-r border-[#c8e2bd] pr-3 space-y-2">
@@ -103,7 +190,7 @@ export const NutritionMatrixFooter: React.FC<Props> = ({
             type="button"
             onClick={onRunSolver}
             disabled={isSolving}
-            className="w-full flex items-center justify-center gap-1.5 bg-[#f57c00] hover:bg-[#e65100] text-white py-2 px-3 rounded-lg font-bold text-xs shadow transition active:scale-95 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-1.5 bg-[#f57c00] hover:bg-[#e65100] text-white py-1.5 px-3 rounded-lg font-bold text-xs shadow transition active:scale-95 disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSolving ? 'animate-spin' : ''}`} />
             <span>{isSolving ? 'Đang cân đối...' : 'Cân đối thực đơn'}</span>

@@ -55,6 +55,7 @@ export default function PMSDashboardPage() {
 
   // 3. Quản lý 3 Phân hệ: Mẫu giáo | Nhà trẻ | Ăn sáng
   const [currentSegment, setCurrentSegment] = useState<AgeGroup>('maugiao');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
 
   // 4. Quản lý Điểm danh 9 lớp học
   const [attendanceData, setAttendanceData] = useState<ClassAttendanceItem[]>(SEED_CLASS_ATTENDANCE);
@@ -445,7 +446,7 @@ export default function PMSDashboardPage() {
         {/* VIEW 1: CÂN ĐỐI DINH DƯỠNG (SPLIT VIEW) */}
         {activeTab === 'menu' && (
           <>
-            {/* Cột Trái: Lịch tuần, Phân hệ, KPI Dinh dưỡng (28% chiều ngang) */}
+            {/* Cột Trái: Lịch tuần, Phân hệ, Cây món ăn, KPI Dinh dưỡng (Hỗ trợ thu gọn/mở rộng) */}
             <LeftSidebarPanel
               schedule={schedule}
               selectedDate={selectedDate}
@@ -465,83 +466,49 @@ export default function PMSDashboardPage() {
               onOpenTemplateModal={() => setIsTemplateModalOpen(true)}
               onCloneCurrentDay={handleCloneCurrentDay}
               onOpenAuditDrawer={() => setIsAuditDrawerOpen(true)}
+              isCollapsed={isSidebarCollapsed}
+              onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             />
 
-            {/* Cột Phải: Thanh thao tác + Lưới Kế toán 13 Cột Toàn Màn Hình */}
+            {/* Cột Phải: Dải điều khiển tài chính hợp nhất + Lưới Kế toán 13 Cột Toàn Màn Hình */}
             <main className="flex-1 flex flex-col overflow-hidden bg-white">
-              {/* Action Toolbar on top of spreadsheet */}
-              <div className="h-11 px-4 border-b border-slate-200 bg-white flex items-center justify-between shrink-0 select-none">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-800 text-xs">
-                      {currentPlan.schoolName}
-                    </span>
-                    <span className="text-slate-300">|</span>
-                    <span className="text-slate-600 text-xs font-mono font-semibold">
-                      {selectedDate}
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-200">
-                      {currentSegment === 'maugiao' ? 'Mẫu giáo' : currentSegment === 'nhatre' ? 'Nhà trẻ' : 'Ăn sáng'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 ml-2 pl-3 border-l border-slate-200">
-                    <span className="text-slate-500 text-[11px] font-medium">Trạng thái:</span>
-                    <select
-                      value={currentPlan.status}
-                      onChange={(e) => handleStatusChange(e.target.value as MenuStatus)}
-                      className="font-bold text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1 text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="DRAFT">📝 Bản nháp (Draft)</option>
-                      <option value="OPTIMIZED">⚡ Đã cân đối MILP</option>
-                      <option value="APPROVED" disabled={!rolePerm.canApproveMenu}>
-                        ✓ BGH Phê duyệt
-                      </option>
-                      <option value="LOCKED" disabled={!rolePerm.canLockMenu}>
-                        🔒 Khóa sổ tiếp phẩm
-                      </option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddModalOpen(true)}
-                    disabled={isLocked || !rolePerm.canEditNutrients}
-                    className={`flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md border shadow-xs transition-all ${
-                      isLocked || !rolePerm.canEditNutrients
-                        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                        : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
-                    }`}
-                  >
-                    <PlusCircle className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Thêm thực phẩm</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleCopyZaloPO}
-                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md border border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100 shadow-xs transition-all"
-                  >
-                    <Copy className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Sao chép Zalo</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="p-1 rounded-md text-slate-500 hover:bg-slate-100 border border-slate-200"
-                    title="In trang A4"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
+              {/* Dải điều khiển tài chính & thao tác hợp nhất siêu gọn chuẩn QLMN */}
+              <FinancialSummaryStrip
+                schoolName={currentPlan.schoolName}
+                segmentLabel={currentSegment === 'maugiao' ? 'Mẫu giáo' : currentSegment === 'nhatre' ? 'Nhà trẻ' : 'Ăn sáng'}
+                date={selectedDate}
+                onDateChange={(d) => setSelectedDate(d)}
+                status={currentPlan.status}
+                onStatusChange={(s) => handleStatusChange(s)}
+                canApproveMenu={rolePerm.canApproveMenu}
+                canLockMenu={rolePerm.canLockMenu}
+                studentCount={currentPlan.studentCount}
+                onStudentCountChange={(cnt) =>
+                  updateCurrentPlan((p) => ({ ...p, studentCount: cnt }))
+                }
+                mealPricePerChild={currentPlan.mealPricePerChild}
+                onMealPriceChange={(pr) =>
+                  updateCurrentPlan((p) => ({ ...p, mealPricePerChild: pr }))
+                }
+                serviceFee={currentPlan.serviceFee || 0}
+                subsidyFee={currentPlan.subsidyFee || 0}
+                initialDifference={currentPlan.initialDifference || 0}
+                totalCost={totals.totalCost}
+                onAddFood={() => setIsAddModalOpen(true)}
+                onCopyZalo={handleCopyZaloPO}
+                onSave={() => {
+                  triggerCloudSync();
+                  showToast('Đã lưu dữ liệu thực đơn thành công', 'success');
+                }}
+                onPrint={() => window.print()}
+                onSaveTemplate={() => showToast('Đã lưu thành thực đơn mẫu chuẩn', 'success')}
+                isLocked={isLocked}
+                canEditNutrients={rolePerm.canEditNutrients}
+              />
 
               {/* Cảnh báo khi thực đơn LOCKED */}
               {isLocked && (
-                <div className="bg-purple-900 text-purple-100 px-4 py-1 text-xs font-bold flex items-center justify-between shrink-0 shadow-inner">
+                <div className="bg-purple-900 text-purple-100 px-3 py-1 text-xs font-bold flex items-center justify-between shrink-0 shadow-inner">
                   <div className="flex items-center gap-2">
                     <Lock className="w-3.5 h-3.5 text-amber-300" />
                     <span>
@@ -558,31 +525,6 @@ export default function PMSDashboardPage() {
                   )}
                 </div>
               )}
-
-              {/* Dải thông số tài chính chuẩn QLMN (Số trẻ, Tiền 1 trẻ, Tổng thu, Tiền dịch vụ, Tiền bổ trợ, Tiền ăn, Chênh lệch) */}
-              <FinancialSummaryStrip
-                date={selectedDate}
-                onDateChange={(d) => setSelectedDate(d)}
-                studentCount={currentPlan.studentCount}
-                onStudentCountChange={(cnt) =>
-                  updateCurrentPlan((p) => ({ ...p, studentCount: cnt }))
-                }
-                mealPricePerChild={currentPlan.mealPricePerChild}
-                onMealPriceChange={(pr) =>
-                  updateCurrentPlan((p) => ({ ...p, mealPricePerChild: pr }))
-                }
-                serviceFee={currentPlan.serviceFee || 0}
-                subsidyFee={currentPlan.subsidyFee || 0}
-                initialDifference={currentPlan.initialDifference || 0}
-                totalCost={totals.totalCost}
-                onSave={() => {
-                  triggerCloudSync();
-                  showToast('Đã lưu dữ liệu thực đơn thành công', 'success');
-                }}
-                onPrint={() => window.print()}
-                onSaveTemplate={() => showToast('Đã lưu thành thực đơn mẫu chuẩn', 'success')}
-                isLocked={isLocked}
-              />
 
               {/* Lưới Kế toán 13 cột toàn màn hình cuộn mượt mà (Có Mã TP, Vạch trạng thái, Nhóm món) */}
               <NutritionGrid

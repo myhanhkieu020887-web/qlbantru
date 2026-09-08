@@ -14,6 +14,10 @@ import {
   AlertCircle,
   CheckCircle2,
   ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Utensils,
+  Layers,
 } from 'lucide-react';
 
 interface Props {
@@ -31,6 +35,8 @@ interface Props {
   onOpenTemplateModal: () => void;
   onCloneCurrentDay: () => void;
   onOpenAuditDrawer?: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export const LeftSidebarPanel: React.FC<Props> = ({
@@ -48,33 +54,100 @@ export const LeftSidebarPanel: React.FC<Props> = ({
   onOpenTemplateModal,
   onCloneCurrentDay,
   onOpenAuditDrawer,
+  isCollapsed = false,
+  onToggleCollapse,
 }) => {
+  // NẾU ĐANG THU GỌN: Render thanh dọc mini (w-12)
+  if (isCollapsed) {
+    return (
+      <aside className="w-11 bg-slate-50 border-r border-slate-200 flex flex-col items-center py-2 shrink-0 select-none text-slate-600 justify-between">
+        <div className="flex flex-col items-center gap-3">
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-700 transition-colors"
+            title="Mở rộng menu trái (Alt + B)"
+          >
+            <PanelLeftOpen className="w-4 h-4 text-blue-600" />
+          </button>
+          <div className="w-6 h-[1px] bg-slate-200" />
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-600 hover:text-blue-700"
+            title="Lịch tuần"
+          >
+            <Calendar className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-600 hover:text-blue-700"
+            title="Nhóm trẻ"
+          >
+            <Layers className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-600 hover:text-blue-700"
+            title="Cây món ăn"
+          >
+            <Utensils className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex flex-col items-center gap-2">
+          <button
+            type="button"
+            onClick={onOpenAuditDrawer}
+            className="p-1.5 rounded-lg hover:bg-purple-50 text-purple-700"
+            title="Thẩm định QĐ 2195"
+          >
+            <ShieldCheck className="w-4 h-4" />
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
+  // TRẠNG THÁI MỞ RỘNG: Bề rộng chuẩn gọn gàng w-64 (256px)
   return (
-    <aside className="w-80 xl:w-96 border-r border-slate-200 bg-slate-50/70 p-3 flex flex-col gap-3 overflow-y-auto shrink-0 select-none text-xs">
+    <aside className="w-64 border-r border-slate-200 bg-slate-50/80 p-2.5 flex flex-col gap-2.5 overflow-y-auto shrink-0 select-none text-xs">
       {/* 1. LỊCH TUẦN 5 NGÀY */}
-      <div className="bg-white rounded-xl p-3 border border-slate-200/80 shadow-xs">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
-            <Calendar className="w-4 h-4 text-blue-600" />
+      <div className="bg-white rounded-lg p-2.5 border border-slate-200/80 shadow-xs">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-1 font-bold text-slate-800 text-[11px]">
+            <Calendar className="w-3.5 h-3.5 text-blue-600" />
             <span>TUẦN 02 / THÁNG 09</span>
           </div>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={onOpenTemplateModal}
-              className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[10px] transition-colors"
-              title="Áp dụng thực đơn mẫu chuẩn 4 tuần"
+              className="px-1.5 py-0.2 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[9px] transition-colors"
+              title="Áp dụng thực đơn mẫu"
             >
               Mẫu
             </button>
             <button
               type="button"
               onClick={onCloneCurrentDay}
-              className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[10px] transition-colors"
-              title="Sao chép ngày hiện tại sang ngày tiếp theo"
+              className="px-1.5 py-0.2 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[9px] transition-colors"
+              title="Sao chép ngày"
             >
               Copy
             </button>
+            {onToggleCollapse && (
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                className="p-0.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors ml-1"
+                title="Thu gọn Sidebar"
+              >
+                <PanelLeftClose className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
