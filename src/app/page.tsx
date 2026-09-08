@@ -126,8 +126,8 @@ export default function PMSDashboardPage() {
   const [suppliersDebt, setSuppliersDebt] = useState<SupplierDebtRecord[]>(SEED_SUPPLIERS_DEBT);
 
   // 9. Quản lý 10 Phân hệ PMS chuyên nghiệp (Menu Accordion chuẩn qlmn.vn)
-  const [activePmsModule, setActivePmsModule] = useState<PmsSubModule>('nutrition_grid');
-  const [isPmsSidebarOpen, setIsPmsSidebarOpen] = useState<boolean>(true);
+  const [activePmsModule, setActivePmsModule] = useState<PmsSubModule>('nutrition_adjust_month');
+  const [isPmsSidebarCollapsed, setIsPmsSidebarCollapsed] = useState<boolean>(false);
   const [storageImportGroups, setStorageImportGroups] = useState<StorageDateGroup[]>(SEED_STORAGE_IMPORT_GROUPS);
 
   // 10. Quản lý Sổ Cân đối khẩu phần theo tháng (Chuẩn qlmn.vn/menu_adjust/list)
@@ -776,8 +776,8 @@ export default function PMSDashboardPage() {
       <PmsAccordionSidebar
         activeModule={activePmsModule}
         onSelectModule={handleSelectPmsModule}
-        isCollapsed={isPmsSidebarOpen}
-        onToggleCollapse={() => setIsPmsSidebarOpen(!isPmsSidebarOpen)}
+        isCollapsed={isPmsSidebarCollapsed}
+        onToggleCollapse={() => setIsPmsSidebarCollapsed(!isPmsSidebarCollapsed)}
         userRole={userRole}
         onRoleChange={(role) => {
           setUserRole(role);
