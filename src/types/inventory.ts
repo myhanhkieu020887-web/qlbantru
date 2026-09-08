@@ -48,6 +48,33 @@ export interface StockTransaction {
   performer: string;          // Người thực hiện (Kế toán/Thủ kho)
 }
 
+// 1.1 KIỂM KÊ KHO BÁN TRÚ (MẪU C30-HD)
+export interface InventoryAuditItem {
+  foodId: string;
+  foodName: string;
+  unit: string;
+  bookQuantity: number;      // Số lượng theo sổ sách kế toán
+  actualQuantity: number;    // Số lượng thực tế kiểm đếm
+  difference: number;        // Chênh lệch = actualQuantity - bookQuantity
+  unitPrice: number;         // Đơn giá bình quân
+  diffAmount: number;        // Giá trị chênh lệch = difference * unitPrice
+  reason?: string;           // Nguyên nhân (hao hụt tự nhiên do bay hơi/vỡ dập, kiểm đếm thừa...)
+  actionProposal?: string;   // Đề xuất xử lý (Ghi giảm hao hụt, nhập bổ sung...)
+}
+
+export interface InventoryAuditReport {
+  id: string;
+  auditCode: string;         // Ví dụ: "KK-20260909-01"
+  auditDate: string;
+  committeeLeader: string;   // Trưởng ban kiểm kê (Phó Hiệu trưởng)
+  accountant: string;        // Kế toán viên
+  warehouseKeeper: string;   // Thủ kho
+  inspector: string;         // Thanh tra nhân dân
+  items: InventoryAuditItem[];
+  notes: string;
+  isApplied: boolean;        // Đã áp dụng điều chỉnh kho hay chưa
+}
+
 // ==========================================
 // 2. KẾ TOÁN QUYẾT TOÁN TIỀN ĂN (MẪU C38-HD)
 // ==========================================

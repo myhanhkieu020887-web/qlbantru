@@ -39,12 +39,14 @@ import {
   StockTransaction,
   SupplierDebtRecord,
   StudentSettlementC38,
+  InventoryAuditReport,
 } from '../types/inventory';
 import {
   SEED_INVENTORY_ITEMS,
   SEED_STOCK_TRANSACTIONS,
   SEED_SUPPLIERS_DEBT,
   SEED_STUDENT_SETTLEMENTS,
+  SEED_AUDIT_REPORTS,
 } from '../data/seed-inventory';
 
 // Modals & Drawers
@@ -106,6 +108,7 @@ export default function PMSDashboardPage() {
   // 7. Quản lý Kho Bán Trú (FIFO)
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(SEED_INVENTORY_ITEMS);
   const [stockTransactions, setStockTransactions] = useState<StockTransaction[]>(SEED_STOCK_TRANSACTIONS);
+  const [auditReports, setAuditReports] = useState<InventoryAuditReport[]>(SEED_AUDIT_REPORTS);
 
   // 8. Quản lý Kế toán Tài chính (C38-HD & 02-TT)
   const [settlements, setSettlements] = useState<StudentSettlementC38[]>(SEED_STUDENT_SETTLEMENTS);
@@ -394,6 +397,56 @@ export default function PMSDashboardPage() {
       })
     );
     showToast(`✓ Đã ghi nhận thanh toán ${formatCurrency(amount)} cho nhà cung cấp!`, 'success');
+  };
+
+  // 9. Áp dụng điều chỉnh cân bằng kho sau kiểm kê (Mẫu C30-HD)
+  const handleApplyAuditAdjustment = (report: InventoryAuditReport) => {
+    const adjustmentTxList: StockTransaction[] = [];
+
+    report.items.forEach((it) => {
+      if (it.difference !== 0) {
+        const isSurplus = it.difference > 0;
+        const tx: StockTransaction = {
+          id: `tx_adj_${Date.now()}_${it.foodId}`,
+          transactionCode: `DC-${Date.now().toString().slice(-6)}`,
+          date: report.auditDate,
+          type: 'ADJUSTMENT',
+          foodId: it.foodId,
+          foodName: it.foodName,
+          unit: it.unit,
+          quantity: Math.abs(it.difference),
+          unitPrice: it.unitPrice,
+          totalAmount: Math.abs(it.diffAmount),
+          reason: isSurplus
+            ? `Điều chỉnh tăng do kiểm kê thừa (${report.auditCode})`
+            : `Điều chỉnh giảm hao hụt tự nhiên theo định mức (${report.auditCode})`,
+          performer: report.accountant,
+        };
+        adjustmentTxList.push(tx);
+      }
+    });
+
+    if (adjustmentTxList.length > 0) {
+      setStockTransactions((prev) => [...adjustmentTxList, ...prev]);
+
+      // Cập nhật tồn kho thực tế cho từng món
+      setInventoryItems((prev) =>
+        prev.map((it) => {
+          const auditItem = report.items.find((ai) => ai.foodId === it.foodId);
+          if (auditItem && auditItem.difference !== 0) {
+            return {
+              ...it,
+              currentStock: auditItem.actualQuantity,
+            };
+          }
+          return it;
+        })
+      );
+    }
+
+    const appliedReport = { ...report, isApplied: true };
+    setAuditReports((prev) => [appliedReport, ...prev.filter((r) => r.id !== report.id)]);
+    showToast(`✓ Đã lập Biên bản ${report.auditCode} & tự động cân bằng kho thành công!`, 'success');
   };
 
   // Thêm thực phẩm từ CSDL chuẩn
@@ -781,7 +834,9 @@ export default function PMSDashboardPage() {
           <WarehouseView
             inventoryItems={inventoryItems}
             transactions={stockTransactions}
+            auditReports={auditReports}
             onAddStockTransaction={handleAddStockTransaction}
+            onApplyAuditAdjustment={handleApplyAuditAdjustment}
             canManageWarehouse={rolePerm.canEditNutrients}
           />
         )}

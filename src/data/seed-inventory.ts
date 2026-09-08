@@ -1,4 +1,10 @@
-import { InventoryItem, StockTransaction, SupplierDebtRecord, StudentSettlementC38 } from '../types/inventory';
+import {
+  InventoryItem,
+  StockTransaction,
+  SupplierDebtRecord,
+  StudentSettlementC38,
+  InventoryAuditReport,
+} from '../types/inventory';
 
 export const SEED_INVENTORY_ITEMS: InventoryItem[] = [
   {
@@ -373,5 +379,69 @@ export const SEED_STUDENT_SETTLEMENTS: StudentSettlementC38[] = [
     refundAmount: 42000,
     status: 'CARRIED_FORWARD',
     parentPhone: '0909.887.665',
+  },
+];
+
+export const SEED_AUDIT_REPORTS: InventoryAuditReport[] = [
+  {
+    id: 'audit_01',
+    auditCode: 'KK-20260905-01',
+    auditDate: '2026-09-05',
+    committeeLeader: 'Phó Hiệu trưởng Nguyễn Thị Lan',
+    accountant: 'Kế toán viên Nguyễn Thị Mai',
+    warehouseKeeper: 'Thủ kho Lê Văn Hưng',
+    inspector: 'Trưởng ban TTND Trần Văn Nam',
+    notes: 'Kiểm kê định kỳ đầu tháng 9/2026 kho thực phẩm khô bán trú.',
+    isApplied: true,
+    items: [
+      {
+        foodId: 'food_gao_te',
+        foodName: 'Gạo tẻ máy',
+        unit: 'kg',
+        bookQuantity: 175,
+        actualQuantity: 175,
+        difference: 0,
+        unitPrice: 22000,
+        diffAmount: 0,
+        reason: 'Khớp 100% số lượng sổ sách',
+        actionProposal: 'Duy trì bảo quản tốt',
+      },
+      {
+        foodId: 'food_dau_meizan',
+        foodName: 'Dầu ăn Meizan 1L',
+        unit: 'Lít',
+        bookQuantity: 40,
+        actualQuantity: 40,
+        difference: 0,
+        unitPrice: 55000,
+        diffAmount: 0,
+        reason: 'Số lượng thực tế đúng theo số chai niêm phong',
+        actionProposal: 'Không xử lý',
+      },
+      {
+        foodId: 'food_duong_cat',
+        foodName: 'Đường cát',
+        unit: 'Kg',
+        bookQuantity: 41,
+        actualQuantity: 40,
+        difference: -1,
+        unitPrice: 25000,
+        diffAmount: -25000,
+        reason: 'Hao hụt tự nhiên do bay hơi và bao bì rách nhẹ',
+        actionProposal: 'Ghi giảm hao hụt định mức cho phép (TT 107/2017)',
+      },
+      {
+        foodId: 'food_muoi_iot',
+        foodName: 'Muối iốt tinh',
+        unit: 'Kg',
+        bookQuantity: 25,
+        actualQuantity: 25,
+        difference: 0,
+        unitPrice: 8000,
+        diffAmount: 0,
+        reason: 'Khớp số lượng',
+        actionProposal: 'Không xử lý',
+      },
+    ],
   },
 ];
