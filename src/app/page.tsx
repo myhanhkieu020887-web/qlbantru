@@ -66,6 +66,11 @@ import { MenuAdjustListView } from '../components/views/MenuAdjustListView';
 import { SEED_MENU_ADJUST_RECORDS } from '../data/seed-menu-adjust';
 import { MenuAdjustRecord } from '../types/menu-adjust';
 
+// Dish List View (Chuan qlmn.vn/single/dinhduong/dish/list)
+import { DishListView } from '../components/views/DishListView';
+import { SEED_DISH_ITEMS } from '../data/seed-dishes';
+import { DishItem } from '../types/dish';
+
 // Icons
 import { Sparkles, PlusCircle, FileSpreadsheet, Copy, Lock, Unlock, Printer } from 'lucide-react';
 
@@ -133,6 +138,9 @@ export default function PMSDashboardPage() {
   // 10. Quản lý Sổ Cân đối khẩu phần theo tháng (Chuẩn qlmn.vn/menu_adjust/list)
   const [menuAdjustRecords, setMenuAdjustRecords] = useState<MenuAdjustRecord[]>(SEED_MENU_ADJUST_RECORDS);
   const [menuViewMode, setMenuViewMode] = useState<'list' | 'detail'>('list');
+
+  // 11. Quản lý Danh mục Món ăn dinh dưỡng (Chuẩn qlmn.vn/dish/list)
+  const [dishItems, setDishItems] = useState<DishItem[]>(SEED_DISH_ITEMS);
 
   // 6. Modals & Toast
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -700,6 +708,9 @@ export default function PMSDashboardPage() {
     } else if (module === 'storage_import') {
       setActiveTab('menu');
       showToast('Đang chuyển đến: Quản lý Nhập kho (theo ngày)', 'info');
+    } else if (module === 'recipes') {
+      setActiveTab('menu');
+      showToast('Đang chuyển đến: Danh mục Món ăn dinh dưỡng (10 món)', 'info');
     } else if (module === 'inventory_stock' || module === 'warehouse_card') {
       setActiveTab('warehouse');
       showToast('Đang chuyển đến: Kho Bán Trú (FIFO)', 'info');
@@ -801,6 +812,25 @@ export default function PMSDashboardPage() {
                 groups={storageImportGroups}
                 onAddImport={handleAddNewStorageItem}
                 onDeleteItem={handleDeleteStorageItem}
+              />
+            </div>
+          ) : activePmsModule === 'recipes' ? (
+            <div className="flex-1 flex overflow-hidden bg-slate-100">
+              <DishListView
+                initialDishes={dishItems}
+                onAddDish={(dish) => {
+                  setDishItems([dish, ...dishItems]);
+                  showToast(`✓ Đã thêm món: ${dish.name}`, 'success');
+                }}
+                onDeleteDish={(id) => {
+                  setDishItems((prev) => prev.filter((d) => d.id !== id));
+                  showToast('✓ Đã xóa món ăn khỏi danh mục', 'info');
+                }}
+                onApplyToMenu={(dish) => {
+                  setActivePmsModule('nutrition_grid');
+                  setMenuViewMode('detail');
+                  showToast(`✓ Đã áp dụng món "${dish.name}" vào thực đơn ngày`, 'success');
+                }}
               />
             </div>
           ) : (activePmsModule === 'nutrition_adjust_month' || menuViewMode === 'list') ? (

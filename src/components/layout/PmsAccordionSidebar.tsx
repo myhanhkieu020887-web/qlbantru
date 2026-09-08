@@ -15,6 +15,7 @@ import {
   ReceiptText,
   Building2,
   Apple,
+  CookingPot,
   ChevronDown,
   ChevronRight,
   Sparkles,
@@ -35,6 +36,7 @@ export type PmsSubModule =
   // 1. Khẩu phần & Học sinh
   | 'nutrition_adjust_month'
   | 'nutrition_grid'
+  | 'recipes'
   | 'attendance'
   | 'menu_templates'
   // 2. Kho & Tiếp phẩm
@@ -94,6 +96,7 @@ export const PmsAccordionSidebar: React.FC<Props> = ({
       items: [
         { id: 'nutrition_adjust_month', label: 'Sổ CĐKP Tháng', icon: Calendar, badge: 'qlmn.vn' },
         { id: 'nutrition_grid', label: 'Lưới Cân đối (13 Cột)', icon: Scale, badge: 'MILP' },
+        { id: 'recipes', label: 'Món ăn dinh dưỡng', icon: CookingPot, badge: '10 món' },
         { id: 'attendance', label: 'Sổ Điểm danh (9 Lớp)', icon: Users, badge: 'Sĩ số' },
         { id: 'menu_templates', label: 'Thực đơn mẫu chuẩn', icon: BookOpenCheck, badge: 'QĐ 2195' },
       ],
