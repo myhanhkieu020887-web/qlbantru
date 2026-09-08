@@ -1,0 +1,210 @@
+import { ComputedMenuItem, MenuItem, NutritionTotals, AgeGroup } from '../types/nutrition';
+
+/**
+ * Tính toán dinh dưỡng chi tiết cho từng nguyên liệu trong thực đơn theo hệ số Atwater
+ * Hệ số bảo toàn năng lượng:
+ * Calo = (Protein * 4) + (Lipid * 9) + (Glucid * 4)
+ */
+export function computeMenuItem(item: MenuItem, studentCount: number): ComputedMenuItem {
+  const { food, gamPerChild } = item;
+  const waste = food.wasteFactor || 0;
+
+  // Khối lượng thực ăn cho cả trường (kg)
+  const actualEatKg = (gamPerChild * studentCount) / 1000;
+
+  // Khối lượng thực mua tính theo hệ số thải bỏ (kg)
+  // Thực mua = Thực ăn / (1 - %thải bỏ / 100)
+  let actualBuyKg = waste < 100 ? actualEatKg / (1 - waste / 100) : actualEatKg;
+
+  // Làm tròn theo bước nhảy thương mại nếu có cấu hình stepSize
+  const step = food.stepSize || 0;
+  if (step > 0) {
+    const unitLower = food.unit.toLowerCase();
+    if (unitLower === 'quả' || unitLower === 'hộp') {
+      const unitsRaw = (actualBuyKg * 1000) / (food.gamExchange || 1000);
+      const roundedUnits = Math.round(unitsRaw / step) * step;
+      actualBuyKg = (roundedUnits * (food.gamExchange || 1000)) / 1000;
+    } else {
+      actualBuyKg = Math.round(actualBuyKg / step) * step;
+    }
+  }
+
+  // Quy đổi thực mua theo Đơn vị tính (ĐVT)
+  const actualBuyUnit = food.gamExchange > 0 
+    ? (actualBuyKg * 1000) / food.gamExchange 
+    : actualBuyKg;
+
+  // Thành tiền cả trường
+  const totalPrice = actualBuyUnit * food.price;
+
+  // Dinh dưỡng tính trên 1 trẻ (gamPerChild / 100)
+  const factor = gamPerChild / 100;
+  const pTotal = food.protein100g * factor;
+  const fTotal = food.fat100g * factor;
+  const carbs = food.carbs100g * factor;
+
+  const proteinAnimal = food.isAnimalProtein ? pTotal : 0;
+  const proteinPlant = !food.isAnimalProtein ? pTotal : 0;
+
+  const fatAnimal = food.isAnimalFat ? fTotal : 0;
+  const fatPlant = !food.isAnimalFat ? fTotal : 0;
+
+  // Calo Atwater bảo toàn
+  const calo = (pTotal * 4) + (fTotal * 9) + (carbs * 4);
+
+  const sodiumMg = (food.sodiumMg || 0) * factor;
+  const calciumMg = (food.calciumMg || 0) * factor;
+  const ironMg = (food.ironMg || 0) * factor;
+  const vitaminB1Mg = (food.vitaminB1Mg || 0) * factor;
+  const vitaminCMg = (food.vitaminCMg || 0) * factor;
+
+  return {
+    ...item,
+    actualEatKg,
+    actualBuyKg,
+    actualBuyUnit,
+    unitPrice: food.price,
+    totalPrice,
+    proteinAnimal,
+    proteinPlant,
+    fatAnimal,
+    fatPlant,
+    carbs,
+    calo,
+    sodiumMg,
+    calciumMg,
+    ironMg,
+    vitaminB1Mg,
+    vitaminCMg,
+  };
+}
+
+/**
+ * Tổng hợp toàn bộ dinh dưỡng của thực đơn trong ngày và kiểm toán theo QĐ 2195 & TT 51/2020
+ */
+export function computeNutritionTotals(
+  items: MenuItem[],
+  studentCount: number,
+  budgetPerChild: number,
+  ageGroup: AgeGroup = 'maugiao'
+): { computedItems: ComputedMenuItem[]; totals: NutritionTotals } {
+  const computedItems = items.map((it) => computeMenuItem(it, studentCount));
+
+  let totalCost = 0;
+  let proteinAnimalG = 0;
+  let proteinPlantG = 0;
+  let fatAnimalG = 0;
+  let fatPlantG = 0;
+  let carbsG = 0;
+  let totalSodiumMg = 0;
+  let freeSugarCalo = 0;
+  let calciumMg = 0;
+  let ironMg = 0;
+  let vitaminB1Mg = 0;
+  let vitaminCMg = 0;
+
+  for (const c of computedItems) {
+    totalCost += c.totalPrice;
+    proteinAnimalG += c.proteinAnimal;
+    proteinPlantG += c.proteinPlant;
+    fatAnimalG += c.fatAnimal;
+    fatPlantG += c.fatPlant;
+    carbsG += c.carbs;
+    totalSodiumMg += c.sodiumMg;
+
+    if (c.food.isFreeSugar) {
+      freeSugarCalo += c.carbs * 4;
+    }
+
+    calciumMg += c.calciumMg;
+    ironMg += c.ironMg;
+    vitaminB1Mg += c.vitaminB1Mg;
+    vitaminCMg += c.vitaminCMg;
+  }
+
+  const totalProteinG = proteinAnimalG + proteinPlantG;
+  const totalFatG = fatAnimalG + fatPlantG;
+
+  // Năng lượng Atwater tuyệt đối
+  const totalCalo = (totalProteinG * 4) + (totalFatG * 9) + (carbsG * 4);
+
+  // Cơ cấu % P - L - G
+  const proteinPct = totalCalo > 0 ? ((totalProteinG * 4) / totalCalo) * 100 : 0;
+  const fatPct = totalCalo > 0 ? ((totalFatG * 9) / totalCalo) * 100 : 0;
+  const carbsPct = totalCalo > 0 ? ((carbsG * 4) / totalCalo) * 100 : 0;
+
+  // Tỷ lệ nguồn gốc
+  const animalProteinRatio = totalProteinG > 0 ? (proteinAnimalG / totalProteinG) * 100 : 0;
+  const plantFatRatio = totalFatG > 0 ? (fatPlantG / totalFatG) * 100 : 0;
+
+  // QĐ 2195: Tỷ lệ năng lượng từ đường tự do
+  const freeSugarCaloPct = totalCalo > 0 ? (freeSugarCalo / totalCalo) * 100 : 0;
+
+  // Tài chính
+  const totalBudget = studentCount * budgetPerChild;
+  const costPerChild = studentCount > 0 ? totalCost / studentCount : 0;
+  const budgetDifference = totalBudget - totalCost; // Dương: còn dư, Âm: bội chi
+  const costPerCalo = totalCalo > 0 ? costPerChild / totalCalo : 0;
+
+  // Tiêu chuẩn theo lứa tuổi
+  const isMauGiao = ageGroup === 'maugiao';
+  const caloMin = isMauGiao ? 615 : 600;
+  const caloMax = isMauGiao ? 738 : 651;
+
+  const isCaloPass = totalCalo >= caloMin && totalCalo <= caloMax;
+  const isRatioPass = isMauGiao
+    ? proteinPct >= 13 && proteinPct <= 20 && fatPct >= 25 && fatPct <= 35 && carbsPct >= 52 && carbsPct <= 60
+    : proteinPct >= 13 && proteinPct <= 20 && fatPct >= 30 && fatPct <= 40 && carbsPct >= 50 && carbsPct <= 60;
+
+  const isAnimalProteinPass = animalProteinRatio >= 50;
+  const isPlantFatPass = plantFatRatio >= 45;
+  const isSodiumPass = totalSodiumMg <= (isMauGiao ? 1200 : 1000);
+  const isSugarPass = freeSugarCaloPct <= 10.0;
+
+  const compliancePassed =
+    isCaloPass &&
+    isRatioPass &&
+    isAnimalProteinPass &&
+    isPlantFatPass &&
+    isSodiumPass &&
+    isSugarPass;
+
+  return {
+    computedItems,
+    totals: {
+      studentCount,
+      budgetPerChild,
+      totalBudget,
+      totalCost,
+      costPerChild,
+      budgetDifference,
+      proteinAnimalG,
+      proteinPlantG,
+      totalProteinG,
+      fatAnimalG,
+      fatPlantG,
+      totalFatG,
+      carbsG,
+      totalCalo,
+      proteinPct,
+      fatPct,
+      carbsPct,
+      animalProteinRatio,
+      plantFatRatio,
+      totalSodiumMg,
+      freeSugarCaloPct,
+      costPerCalo,
+      calciumMg,
+      ironMg,
+      vitaminB1Mg,
+      vitaminCMg,
+      isCaloPass,
+      isRatioPass,
+      isAnimalProteinPass,
+      isPlantFatPass,
+      isSodiumPass,
+      isSugarPass,
+      compliancePassed,
+    },
+  };
+}
