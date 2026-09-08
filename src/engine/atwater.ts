@@ -54,6 +54,7 @@ export function computeMenuItem(item: MenuItem, studentCount: number): ComputedM
 
   const sodiumMg = (food.sodiumMg || 0) * factor;
   const calciumMg = (food.calciumMg || 0) * factor;
+  const phosphorusMg = (food.phosphorusMg ?? Math.round((food.protein100g * 14) + ((food.calciumMg || 0) * 0.75))) * factor;
   const ironMg = (food.ironMg || 0) * factor;
   const vitaminB1Mg = (food.vitaminB1Mg || 0) * factor;
   const vitaminCMg = (food.vitaminCMg || 0) * factor;
@@ -73,6 +74,7 @@ export function computeMenuItem(item: MenuItem, studentCount: number): ComputedM
     calo,
     sodiumMg,
     calciumMg,
+    phosphorusMg,
     ironMg,
     vitaminB1Mg,
     vitaminCMg,
@@ -99,6 +101,7 @@ export function computeNutritionTotals(
   let totalSodiumMg = 0;
   let freeSugarCalo = 0;
   let calciumMg = 0;
+  let phosphorusMg = 0;
   let ironMg = 0;
   let vitaminB1Mg = 0;
   let vitaminCMg = 0;
@@ -117,6 +120,7 @@ export function computeNutritionTotals(
     }
 
     calciumMg += c.calciumMg;
+    phosphorusMg += c.phosphorusMg;
     ironMg += c.ironMg;
     vitaminB1Mg += c.vitaminB1Mg;
     vitaminCMg += c.vitaminCMg;
@@ -136,6 +140,9 @@ export function computeNutritionTotals(
   // Tỷ lệ nguồn gốc
   const animalProteinRatio = totalProteinG > 0 ? (proteinAnimalG / totalProteinG) * 100 : 0;
   const plantFatRatio = totalFatG > 0 ? (fatPlantG / totalFatG) * 100 : 0;
+
+  // QĐ 2195: Tỷ lệ Canxi / Photpho (Ca:P)
+  const calciumPhosphorusRatio = phosphorusMg > 0 ? calciumMg / phosphorusMg : 1.0;
 
   // QĐ 2195: Tỷ lệ năng lượng từ đường tự do
   const freeSugarCaloPct = totalCalo > 0 ? (freeSugarCalo / totalCalo) * 100 : 0;
@@ -160,6 +167,8 @@ export function computeNutritionTotals(
   const isPlantFatPass = plantFatRatio >= 45;
   const isSodiumPass = totalSodiumMg <= (isMauGiao ? 1200 : 1000);
   const isSugarPass = freeSugarCaloPct <= 10.0;
+  const isCaPRatioPass = calciumPhosphorusRatio >= 0.7 && calciumPhosphorusRatio <= 1.5;
+  const isIronPass = ironMg >= (isMauGiao ? 3.5 : 2.8);
 
   const compliancePassed =
     isCaloPass &&
@@ -167,7 +176,9 @@ export function computeNutritionTotals(
     isAnimalProteinPass &&
     isPlantFatPass &&
     isSodiumPass &&
-    isSugarPass;
+    isSugarPass &&
+    isCaPRatioPass &&
+    isIronPass;
 
   return {
     computedItems,
@@ -195,6 +206,8 @@ export function computeNutritionTotals(
       freeSugarCaloPct,
       costPerCalo,
       calciumMg,
+      phosphorusMg,
+      calciumPhosphorusRatio,
       ironMg,
       vitaminB1Mg,
       vitaminCMg,
@@ -204,6 +217,8 @@ export function computeNutritionTotals(
       isPlantFatPass,
       isSodiumPass,
       isSugarPass,
+      isCaPRatioPass,
+      isIronPass,
       compliancePassed,
     },
   };

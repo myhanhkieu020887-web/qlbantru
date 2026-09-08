@@ -30,9 +30,11 @@ import { SmartPOView } from '../components/views/SmartPOView';
 import { FoodSafetyView } from '../components/views/FoodSafetyView';
 import { NutritionGrid } from '../components/grid/NutritionGrid';
 
-// Modals
+// Modals & Drawers
 import { AddFoodModal } from '../components/dialogs/AddFoodModal';
 import { ApplyTemplateModal } from '../components/dialogs/ApplyTemplateModal';
+import { NutritionalAuditDrawer } from '../components/dialogs/NutritionalAuditDrawer';
+import { SolverResult } from '../engine/milp-solver';
 
 // Icons
 import { Sparkles, PlusCircle, FileSpreadsheet, Copy, Lock, Unlock, Printer } from 'lucide-react';
@@ -58,6 +60,11 @@ export default function PMSDashboardPage() {
 
   // 5. Quản lý Trạng thái Mở khóa chia ăn (ATTP)
   const [isDistributionUnlocked, setIsDistributionUnlocked] = useState<boolean>(false);
+
+  // 6. Quản lý Ngăn Thẩm Định Lượng & Chất (Dành cho Hiệu phó Bán trú)
+  const [isAuditDrawerOpen, setIsAuditDrawerOpen] = useState<boolean>(false);
+  const [solverResult, setSolverResult] = useState<SolverResult | null>(null);
+  const [isSolving, setIsSolving] = useState<boolean>(false);
 
   // 6. Modals & Toast
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -151,12 +158,15 @@ export default function PMSDashboardPage() {
       return;
     }
 
+    setIsSolving(true);
     const res = solveNutritionMenu(
       currentPlan.items,
       currentPlan.studentCount,
       currentPlan.ageGroup,
       { targetBudgetPerChild: currentPlan.mealPricePerChild }
     );
+    setIsSolving(false);
+    setSolverResult(res);
 
     if (res.success) {
       updateCurrentPlan((prev) => ({
@@ -425,6 +435,7 @@ export default function PMSDashboardPage() {
         isDistributionUnlocked={isDistributionUnlocked}
         onRunSolver={handleRunSolver}
         onExportExcel={handleExportExcel}
+        onOpenAuditDrawer={() => setIsAuditDrawerOpen(true)}
         canRunSolver={rolePerm.canRunSolver && !isLocked}
       />
 
@@ -452,6 +463,7 @@ export default function PMSDashboardPage() {
               totals={totals}
               onOpenTemplateModal={() => setIsTemplateModalOpen(true)}
               onCloneCurrentDay={handleCloneCurrentDay}
+              onOpenAuditDrawer={() => setIsAuditDrawerOpen(true)}
             />
 
             {/* Cột Phải: Thanh thao tác + Lưới Kế toán 13 Cột Toàn Màn Hình */}
@@ -605,6 +617,19 @@ export default function PMSDashboardPage() {
         isOpen={isTemplateModalOpen}
         onClose={() => setIsTemplateModalOpen(false)}
         onApplyTemplate={handleApplyTemplate}
+      />
+
+      {/* NGĂN THẨM ĐỊNH LƯỢNG & CHẤT (DÀNH CHO PHÓ HIỆU TRƯỞNG BÁN TRÚ) */}
+      <NutritionalAuditDrawer
+        isOpen={isAuditDrawerOpen}
+        onClose={() => setIsAuditDrawerOpen(false)}
+        menuPlan={currentPlan}
+        computedItems={computedItems}
+        totals={totals}
+        onRunSolver={handleRunSolver}
+        onApproveMenu={() => handleStatusChange('APPROVED')}
+        solverResult={solverResult}
+        isSolving={isSolving}
       />
 
       {/* Toast Notification */}

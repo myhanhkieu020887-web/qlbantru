@@ -37,6 +37,7 @@ export interface FoodItem {
   fat100g: number;
   carbs100g: number;
   calciumMg?: number;
+  phosphorusMg?: number;
   ironMg?: number;
   vitaminB1Mg?: number;
   vitaminCMg?: number;
@@ -74,6 +75,7 @@ export interface ComputedMenuItem extends MenuItem {
   calo: number;
   sodiumMg: number;
   calciumMg: number;
+  phosphorusMg: number;
   ironMg: number;
   vitaminB1Mg: number;
   vitaminCMg: number;
@@ -113,6 +115,8 @@ export interface NutritionTotals {
 
   // Vi chất dinh dưỡng
   calciumMg: number;
+  phosphorusMg: number;
+  calciumPhosphorusRatio: number; // Tỷ lệ Canxi / Photpho (Ca:P)
   ironMg: number;
   vitaminB1Mg: number;
   vitaminCMg: number;
@@ -124,6 +128,8 @@ export interface NutritionTotals {
   isPlantFatPass: boolean;
   isSodiumPass: boolean;
   isSugarPass: boolean;
+  isCaPRatioPass: boolean;
+  isIronPass: boolean;
   compliancePassed: boolean;
 }
 

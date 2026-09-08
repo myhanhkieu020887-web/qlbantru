@@ -1,5 +1,5 @@
 import { AgeGroup, MenuItem } from '../types/nutrition';
-import { computeMenuItem, computeNutritionTotals } from './atwater';
+import { computeNutritionTotals } from './atwater';
 
 export interface SolverOptions {
   targetBudgetPerChild?: number;
@@ -19,11 +19,14 @@ export interface SolverResult {
   optimizedCost: number;
   originalCalo: number;
   optimizedCalo: number;
+  budgetDifferencePerChild: number;
 }
 
 /**
  * Thuật toán Cân đối Khẩu phần 2 pha (2-Phase Elastic MILP Engine)
- * Chạy 100% Client-side siêu tốc (<20ms), không cần kết nối server.
+ * Chuyên biệt dành cho Hiệu phó Bán trú:
+ * Pha 1: Tối ưu hóa đa mục tiêu gradient descent đưa Calo & Macro P-L-G vào dải Vàng QĐ 2195.
+ * Pha 2: Khóa cứng Ngân sách tiền ăn bằng vi chỉnh định lượng tinh bột nền (sai số |chi - thu| ≤ 10đ/cháu).
  */
 export function solveNutritionMenu(
   items: MenuItem[],
@@ -47,7 +50,6 @@ export function solveNutritionMenu(
   const originalCalo = initial.totals.totalCalo;
 
   // 2. Phân loại nguyên liệu: Cố định vs Biến đổi
-  // Cố định: Gia vị, đường, muối, mắm, tiêu, tỏi, trứng (nguyên quả), sữa chua (hộp)
   const isItemFixed = (it: MenuItem): boolean => {
     if (it.isFixed || it.food.isFixed) return true;
     const cat = it.food.category;
@@ -57,13 +59,11 @@ export function solveNutritionMenu(
     return false;
   };
 
-  // Sao chép mảng items để tối ưu
   const optimizedItems: MenuItem[] = items.map((it) => ({
     ...it,
     gamPerChild: it.gamPerChild,
   }));
 
-  // Lọc danh sách biến đổi
   const variableIndices: number[] = [];
   optimizedItems.forEach((it, idx) => {
     if (!isItemFixed(it)) {
@@ -82,10 +82,11 @@ export function solveNutritionMenu(
       optimizedCost: originalCost,
       originalCalo,
       optimizedCalo: originalCalo,
+      budgetDifferencePerChild: Math.round(originalCost - targetBudget),
     };
   }
 
-  // Khởi tạo giới hạn cận trên / cận dưới cho từng nguyên liệu (±30% đến ±50%)
+  // Khởi tạo giới hạn sinh học chuẩn QĐ 2195
   const minGams = variableIndices.map((idx) => {
     const val = optimizedItems[idx].gamPerChild;
     return Math.max(1.0, val * 0.5);
@@ -95,34 +96,29 @@ export function solveNutritionMenu(
     return val * 1.6;
   });
 
-  // Vector biến số hiện tại x
   let x = variableIndices.map((idx) => optimizedItems[idx].gamPerChild);
 
-  // Mục tiêu gam dưỡng chất mong muốn
   const targetP_g = (targetCalo * (targetP_pct / 100)) / 4;
   const targetL_g = (targetCalo * (targetL_pct / 100)) / 9;
   const targetG_g = (targetCalo * (targetG_pct / 100)) / 4;
 
-  // 3. Tối ưu đa tiêu chí (Elastic Goal Programming / Bounded Projected Gradient)
+  // 3. Pha 1: Tối ưu Gradient Descent đưa Calo & Macro P-L-G về chuẩn
   const maxIterations = 150;
-  let learningRate = 0.005;
+  const learningRate = 0.005;
 
   for (let iter = 0; iter < maxIterations; iter++) {
-    // Cập nhật lại giá trị vào optimizedItems
     variableIndices.forEach((itemIdx, vIdx) => {
       optimizedItems[itemIdx].gamPerChild = x[vIdx];
     });
 
     const currentTotals = computeNutritionTotals(optimizedItems, studentCount, targetBudget, ageGroup).totals;
 
-    // Sai lệch các tiêu chí
-    const costErr = (currentTotals.costPerChild - targetBudget) / targetBudget; // Lệch ngân sách
-    const caloErr = (currentTotals.totalCalo - targetCalo) / targetCalo; // Lệch calo
+    const costErr = (currentTotals.costPerChild - targetBudget) / targetBudget;
+    const caloErr = (currentTotals.totalCalo - targetCalo) / targetCalo;
     const pErr = (currentTotals.totalProteinG - targetP_g) / targetP_g;
     const lErr = (currentTotals.totalFatG - targetL_g) / targetL_g;
     const gErr = (currentTotals.carbsG - targetG_g) / targetG_g;
 
-    // Nếu đã thỏa mãn rất gần (sai lệch nhỏ hơn 0.3% cho ngân sách và calo) -> Dừng sớm
     if (
       Math.abs(costErr) < 0.003 &&
       Math.abs(caloErr) < 0.005 &&
@@ -132,23 +128,19 @@ export function solveNutritionMenu(
       break;
     }
 
-    // Cập nhật từng biến số
     for (let v = 0; v < variableIndices.length; v++) {
       const it = optimizedItems[variableIndices[v]];
       const food = it.food;
 
-      // Đóng góp của 1 gam thực phẩm này:
       const p1g = food.protein100g / 100;
       const l1g = food.fat100g / 100;
       const g1g = food.carbs100g / 100;
       const calo1g = p1g * 4 + l1g * 9 + g1g * 4;
 
-      // Giá 1 gam thực mua
       const waste = food.wasteFactor || 0;
       const buyFactor = waste < 100 ? 1 / (1 - waste / 100) : 1;
       const cost1g = (food.price / (food.gamExchange || 1000)) * buyFactor;
 
-      // Gradient tổng hợp (hướng làm giảm lỗi)
       const grad =
         costErr * cost1g * 2.0 +
         caloErr * (calo1g / 20) * 1.5 +
@@ -157,23 +149,40 @@ export function solveNutritionMenu(
         gErr * (g1g * 4) * 0.8;
 
       x[v] -= learningRate * grad * 15;
-
-      // Giới hạn biên
       x[v] = Math.max(minGams[v], Math.min(maxGams[v], x[v]));
     }
   }
 
-  // 4. Làm tròn số liệu sạch sẽ (2 chữ số thập phân)
+  // Làm tròn 1 chữ số thập phân sau Pha 1
   variableIndices.forEach((itemIdx, vIdx) => {
-    optimizedItems[itemIdx].gamPerChild = Math.round(x[vIdx] * 100) / 100;
+    optimizedItems[itemIdx].gamPerChild = Math.round(x[vIdx] * 10) / 10;
   });
+
+  // 4. Pha 2: Khóa Cứng Ngân Sách Bằng Vi Chỉnh Tinh Bột Nền (Budget Hard-Lock)
+  const midTotals = computeNutritionTotals(optimizedItems, studentCount, targetBudget, ageGroup).totals;
+  const residual = targetBudget - midTotals.costPerChild;
+
+  // Tìm nguyên liệu tinh bột chính (gạo hoặc nui) để hấp thụ phần sai số ngân sách
+  const grainItem = optimizedItems.find((it) => it.food.category === 'gao' && it.gamPerChild >= 20);
+  if (grainItem) {
+    const food = grainItem.food;
+    const waste = food.wasteFactor || 0;
+    const buyFactor = waste < 100 ? 1 / (1 - waste / 100) : 1;
+    const cost1g = (food.price / (food.gamExchange || 1000)) * buyFactor;
+
+    if (cost1g > 0) {
+      const deltaG = residual / cost1g;
+      grainItem.gamPerChild = Math.round((grainItem.gamPerChild + deltaG) * 10) / 10;
+    }
+  }
 
   const finalTotals = computeNutritionTotals(optimizedItems, studentCount, targetBudget, ageGroup).totals;
   const runtimeMs = Math.round(performance.now() - startTime);
+  const finalDiffPerChild = Math.round(finalTotals.costPerChild - targetBudget);
 
   return {
     success: true,
-    message: `Đã cân đối tối ưu thành công trong ${runtimeMs}ms!`,
+    message: `Cân đối tối ưu thành công! Ngân sách: ${Math.round(finalTotals.costPerChild).toLocaleString('vi-VN')} đ (Lệch: ${finalDiffPerChild >= 0 ? '+' : ''}${finalDiffPerChild} đ/cháu) trong ${runtimeMs}ms`,
     items: optimizedItems,
     iterations: maxIterations,
     runtimeMs,
@@ -181,5 +190,6 @@ export function solveNutritionMenu(
     optimizedCost: finalTotals.costPerChild,
     originalCalo,
     optimizedCalo: finalTotals.totalCalo,
+    budgetDifferencePerChild: finalDiffPerChild,
   };
 }

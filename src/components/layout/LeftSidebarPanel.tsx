@@ -30,6 +30,7 @@ interface Props {
   totals: NutritionTotals;
   onOpenTemplateModal: () => void;
   onCloneCurrentDay: () => void;
+  onOpenAuditDrawer?: () => void;
 }
 
 export const LeftSidebarPanel: React.FC<Props> = ({
@@ -46,6 +47,7 @@ export const LeftSidebarPanel: React.FC<Props> = ({
   totals,
   onOpenTemplateModal,
   onCloneCurrentDay,
+  onOpenAuditDrawer,
 }) => {
   return (
     <aside className="w-80 xl:w-96 border-r border-slate-200 bg-slate-50/70 p-3 flex flex-col gap-3 overflow-y-auto shrink-0 select-none text-xs">
@@ -259,14 +261,18 @@ export const LeftSidebarPanel: React.FC<Props> = ({
         </div>
 
         {/* KPI 3: QĐ 2195 Natri & Đường */}
-        <div className="bg-white rounded-xl p-3 border border-slate-200/80 shadow-xs">
+        <div
+          onClick={onOpenAuditDrawer}
+          className="bg-white rounded-xl p-3 border border-slate-200/80 shadow-xs hover:border-indigo-300 hover:shadow-sm cursor-pointer transition"
+          title="Bấm để mở Ngăn Thẩm Định Lượng & Chất (QĐ 2195)"
+        >
           <div className="flex items-center justify-between text-[11px] mb-1">
             <span className="font-bold text-slate-700 flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
               KIỂM SOÁT QĐ 2195
             </span>
-            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded">
-              BẮT BUỘC
+            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded hover:bg-indigo-100">
+              CHI TIẾT &rarr;
             </span>
           </div>
           <div className="space-y-1 text-[11px]">

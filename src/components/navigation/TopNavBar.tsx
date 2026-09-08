@@ -19,6 +19,7 @@ interface TopNavBarProps {
   isDistributionUnlocked: boolean;
   onRunSolver?: () => void;
   onExportExcel?: () => void;
+  onOpenAuditDrawer?: () => void;
   canRunSolver?: boolean;
 }
 
@@ -32,6 +33,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   isDistributionUnlocked,
   onRunSolver,
   onExportExcel,
+  onOpenAuditDrawer,
   canRunSolver = true,
 }) => {
   return (
@@ -117,6 +119,18 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
       <div className="flex items-center gap-2.5">
         {activeTab === 'menu' && (
           <div className="flex items-center gap-1.5 mr-1 pr-2.5 border-r border-slate-200">
+            {onOpenAuditDrawer && (
+              <button
+                type="button"
+                onClick={onOpenAuditDrawer}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 transition-all shadow-xs"
+                title="Thẩm định Lượng & Chất QĐ 2195 dành cho Hiệu phó Bán trú"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Thẩm Định QĐ 2195</span>
+              </button>
+            )}
+
             {onRunSolver && (
               <button
                 type="button"
