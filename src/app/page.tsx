@@ -55,6 +55,12 @@ import { ApplyTemplateModal } from '../components/dialogs/ApplyTemplateModal';
 import { NutritionalAuditDrawer } from '../components/dialogs/NutritionalAuditDrawer';
 import { SolverResult } from '../engine/milp-solver';
 
+// PMS 10-Module Accordion & Storage Import List View (Chuan qlmn.vn)
+import { PmsAccordionSidebar, PmsSubModule } from '../components/layout/PmsAccordionSidebar';
+import { StorageImportListView } from '../components/views/StorageImportListView';
+import { SEED_STORAGE_IMPORT_GROUPS } from '../data/seed-storage-import';
+import { StorageDateGroup, StorageImportItem } from '../types/storage';
+
 // Icons
 import { Sparkles, PlusCircle, FileSpreadsheet, Copy, Lock, Unlock, Printer } from 'lucide-react';
 
@@ -113,6 +119,11 @@ export default function PMSDashboardPage() {
   // 8. Quản lý Kế toán Tài chính (C38-HD & 02-TT)
   const [settlements, setSettlements] = useState<StudentSettlementC38[]>(SEED_STUDENT_SETTLEMENTS);
   const [suppliersDebt, setSuppliersDebt] = useState<SupplierDebtRecord[]>(SEED_SUPPLIERS_DEBT);
+
+  // 9. Quản lý 10 Phân hệ PMS chuyên nghiệp (Menu Accordion chuẩn qlmn.vn)
+  const [activePmsModule, setActivePmsModule] = useState<PmsSubModule>('nutrition_grid');
+  const [isPmsSidebarOpen, setIsPmsSidebarOpen] = useState<boolean>(true);
+  const [storageImportGroups, setStorageImportGroups] = useState<StorageDateGroup[]>(SEED_STORAGE_IMPORT_GROUPS);
 
   // 6. Modals & Toast
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -657,6 +668,54 @@ export default function PMSDashboardPage() {
     showToast('✓ Đã sao chép đơn hàng Zalo phân loại 5 nhà cung cấp!', 'success');
   };
 
+  // 9. Handlers cho 10 Phân hệ PMS Accordion chuẩn qlmn.vn
+  const handleSelectPmsModule = (module: PmsSubModule) => {
+    setActivePmsModule(module);
+    if (module === 'storage_import') {
+      setActiveTab('menu');
+      showToast('Đang chuyển đến phân hệ: Quản lý Nhập kho (theo ngày)', 'info');
+    } else if (module === 'nutrition_grid') {
+      setActiveTab('menu');
+      showToast('Đang chuyển đến phân hệ: Cân đối khẩu phần (Lưới 13 cột)', 'info');
+    } else if (module === 'inventory_stock' || module === 'inventory_history' || module === 'warehouse_card') {
+      setActiveTab('warehouse');
+      showToast('Đang chuyển đến phân hệ: Kho Bán Trú (FIFO)', 'info');
+    } else if (module === 'suppliers') {
+      setActiveTab('finance');
+      showToast('Đang chuyển đến danh mục: Nhà cung cấp & Công nợ', 'info');
+    } else if (module === 'menu_templates') {
+      setIsTemplateModalOpen(true);
+    } else if (module === 'reports_forms') {
+      setIsAuditDrawerOpen(true);
+    } else if (module === 'school_food' || module === 'recipes') {
+      setIsAddModalOpen(true);
+    } else {
+      showToast(`Đã chọn phân hệ: ${module}`, 'info');
+    }
+  };
+
+  const handleDeleteStorageItem = (id: string) => {
+    setStorageImportGroups((prev) =>
+      prev
+        .map((group) => {
+          const updatedItems = group.items.filter((it) => it.id !== id);
+          const updatedTotal = updatedItems.reduce((sum, it) => sum + it.totalPrice, 0);
+          return {
+            ...group,
+            itemCount: updatedItems.length,
+            items: updatedItems,
+            totalGroupAmount: updatedTotal,
+          };
+        })
+        .filter((group) => group.items.length > 0)
+    );
+    showToast('✓ Đã xóa mặt hàng khỏi phiếu nhập kho', 'info');
+  };
+
+  const handleAddNewStorageItem = () => {
+    showToast('Đang mở biểu mẫu thêm phiếu nhập kho mới...', 'info');
+  };
+
   const isLocked = currentPlan.status === 'LOCKED';
   const rolePerm = ROLE_PERMISSIONS[userRole];
 
@@ -683,13 +742,30 @@ export default function PMSDashboardPage() {
         canRunSolver={rolePerm.canRunSolver && !isLocked}
       />
 
-      {/* 2. MAIN APPLICATION CONTENT (Switch between 4 Views) */}
+      {/* 2. MAIN APPLICATION CONTENT */}
       <div className="flex-1 flex overflow-hidden">
-        {/* VIEW 1: CÂN ĐỐI DINH DƯỠNG (SPLIT VIEW) */}
+        {/* PMS Accordion Sidebar chuẩn qlmn.vn (10 phân hệ nghiệp vụ) */}
+        <PmsAccordionSidebar
+          activeModule={activePmsModule}
+          onSelectModule={handleSelectPmsModule}
+          isCollapsed={isPmsSidebarOpen}
+          onToggleCollapse={() => setIsPmsSidebarOpen(!isPmsSidebarOpen)}
+        />
+
+        {/* VIEW 1: CÂN ĐỐI DINH DƯỠNG HOẶC QUẢN LÝ NHẬP KHO */}
         {activeTab === 'menu' && (
-          <>
-            {/* Cột Trái: Lịch tuần, Phân hệ, Cây món ăn, KPI Dinh dưỡng (Hỗ trợ thu gọn/mở rộng) */}
-            <LeftSidebarPanel
+          activePmsModule === 'storage_import' ? (
+            <div className="flex-1 flex overflow-hidden bg-slate-100">
+              <StorageImportListView
+                groups={storageImportGroups}
+                onAddImport={handleAddNewStorageItem}
+                onDeleteItem={handleDeleteStorageItem}
+              />
+            </div>
+          ) : (
+            <>
+              {/* Cột Trái: Lịch tuần, Phân hệ, Cây món ăn, KPI Dinh dưỡng (Hỗ trợ thu gọn/mở rộng) */}
+              <LeftSidebarPanel
               schedule={schedule}
               selectedDate={selectedDate}
               onSelectDate={(d) => setSelectedDate(d)}
@@ -794,6 +870,7 @@ export default function PMSDashboardPage() {
               />
             </main>
           </>
+          )
         )}
 
         {/* VIEW 2: SỔ ĐIỂM DANH 9 LỚP */}
