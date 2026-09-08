@@ -23,7 +23,7 @@ import { UserRole, ROLE_PERMISSIONS } from '../types/auth';
 import { SyncStatus, checkSupabaseConnection } from '../lib/supabase/client';
 import { saveDailyMenuToSupabase, saveAttendanceToSupabase } from '../lib/supabase/repository';
 
-import { TopNavBar, AppTab } from '../components/navigation/TopNavBar';
+import { AppTab } from '../components/navigation/TopNavBar';
 import { LeftSidebarPanel } from '../components/layout/LeftSidebarPanel';
 import { AttendanceView } from '../components/views/AttendanceView';
 import { SmartPOView } from '../components/views/SmartPOView';
@@ -677,19 +677,35 @@ export default function PMSDashboardPage() {
     showToast('✓ Đã sao chép đơn hàng Zalo phân loại 5 nhà cung cấp!', 'success');
   };
 
-  // 9. Handlers cho 10 Phân hệ PMS Accordion chuẩn qlmn.vn
+  // 9. Handlers cho 13 Phân hệ PMS Accordion Hợp nhất Chuẩn qlmn.vn
   const handleSelectPmsModule = (module: PmsSubModule) => {
     setActivePmsModule(module);
-    if (module === 'storage_import') {
-      setActiveTab('menu');
-      showToast('Đang chuyển đến phân hệ: Quản lý Nhập kho (theo ngày)', 'info');
-    } else if (module === 'nutrition_grid') {
+    if (module === 'nutrition_adjust_month') {
       setActiveTab('menu');
       setMenuViewMode('list');
       showToast('Đang chuyển đến: Sổ Cân đối khẩu phần tháng', 'info');
-    } else if (module === 'inventory_stock' || module === 'inventory_history' || module === 'warehouse_card') {
+    } else if (module === 'nutrition_grid') {
+      setActiveTab('menu');
+      setMenuViewMode('detail');
+      showToast('Đang chuyển đến: Lưới Kế toán Cân đối khẩu phần (13 Cột)', 'info');
+    } else if (module === 'attendance') {
+      setActiveTab('attendance');
+      showToast('Đang chuyển đến: Sổ Điểm danh (9 Lớp)', 'info');
+    } else if (module === 'smart_po') {
+      setActiveTab('smart_po');
+      showToast('Đang chuyển đến: Tiếp phẩm & Smart PO', 'info');
+    } else if (module === 'food_safety') {
+      setActiveTab('food_safety');
+      showToast('Đang chuyển đến: Sổ Kiểm thực 3 bước ATTP', 'info');
+    } else if (module === 'storage_import') {
+      setActiveTab('menu');
+      showToast('Đang chuyển đến: Quản lý Nhập kho (theo ngày)', 'info');
+    } else if (module === 'inventory_stock' || module === 'warehouse_card') {
       setActiveTab('warehouse');
-      showToast('Đang chuyển đến phân hệ: Kho Bán Trú (FIFO)', 'info');
+      showToast('Đang chuyển đến: Kho Bán Trú (FIFO)', 'info');
+    } else if (module === 'finance') {
+      setActiveTab('finance');
+      showToast('Đang chuyển đến: Kế toán Tài chính', 'info');
     } else if (module === 'suppliers') {
       setActiveTab('finance');
       showToast('Đang chuyển đến danh mục: Nhà cung cấp & Công nợ', 'info');
@@ -697,7 +713,7 @@ export default function PMSDashboardPage() {
       setIsTemplateModalOpen(true);
     } else if (module === 'reports_forms') {
       setIsAuditDrawerOpen(true);
-    } else if (module === 'school_food' || module === 'recipes') {
+    } else if (module === 'school_food') {
       setIsAddModalOpen(true);
     } else {
       showToast(`Đã chọn phân hệ: ${module}`, 'info');
@@ -714,6 +730,7 @@ export default function PMSDashboardPage() {
     } else {
       setCurrentSegment('ansang');
     }
+    setActivePmsModule('nutrition_grid');
     setMenuViewMode('detail');
     showToast(`Đang mở Lưới 13 cột điều chỉnh ngày ${record.date}`, 'info');
   };
@@ -731,6 +748,7 @@ export default function PMSDashboardPage() {
     setStorageImportGroups((prev) =>
       prev
         .map((group) => {
+          if (!group.items.some((it) => it.id === id)) return group;
           const updatedItems = group.items.filter((it) => it.id !== id);
           const updatedTotal = updatedItems.reduce((sum, it) => sum + it.totalPrice, 0);
           return {
@@ -753,11 +771,13 @@ export default function PMSDashboardPage() {
   const rolePerm = ROLE_PERMISSIONS[userRole];
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-100 font-sans">
-      {/* 1. TOP APP NAVIGATION BAR (Linear / Stripe Style) */}
-      <TopNavBar
-        activeTab={activeTab}
-        onTabChange={(tab) => setActiveTab(tab)}
+    <div className="flex h-screen w-screen overflow-hidden bg-slate-100 font-sans">
+      {/* 1. PMS UNIFIED SIDEBAR (Thay thế hoàn toàn Header cũ) */}
+      <PmsAccordionSidebar
+        activeModule={activePmsModule}
+        onSelectModule={handleSelectPmsModule}
+        isCollapsed={isPmsSidebarOpen}
+        onToggleCollapse={() => setIsPmsSidebarOpen(!isPmsSidebarOpen)}
         userRole={userRole}
         onRoleChange={(role) => {
           setUserRole(role);
@@ -769,22 +789,10 @@ export default function PMSDashboardPage() {
           showToast('Đang gửi đồng bộ lên Supabase Cloud...', 'info');
         }}
         isDistributionUnlocked={isDistributionUnlocked}
-        onRunSolver={handleRunSolver}
-        onExportExcel={handleExportExcel}
-        onOpenAuditDrawer={() => setIsAuditDrawerOpen(true)}
-        canRunSolver={rolePerm.canRunSolver && !isLocked}
       />
 
-      {/* 2. MAIN APPLICATION CONTENT */}
+      {/* 2. MAIN APPLICATION CONTENT (Tràn màn hình tối đa chiều dọc) */}
       <div className="flex-1 flex overflow-hidden">
-        {/* PMS Accordion Sidebar chuẩn qlmn.vn (10 phân hệ nghiệp vụ) */}
-        <PmsAccordionSidebar
-          activeModule={activePmsModule}
-          onSelectModule={handleSelectPmsModule}
-          isCollapsed={isPmsSidebarOpen}
-          onToggleCollapse={() => setIsPmsSidebarOpen(!isPmsSidebarOpen)}
-        />
-
         {/* VIEW 1: CÂN ĐỐI DINH DƯỠNG HOẶC QUẢN LÝ NHẬP KHO */}
         {activeTab === 'menu' && (
           activePmsModule === 'storage_import' ? (
@@ -795,7 +803,7 @@ export default function PMSDashboardPage() {
                 onDeleteItem={handleDeleteStorageItem}
               />
             </div>
-          ) : menuViewMode === 'list' ? (
+          ) : (activePmsModule === 'nutrition_adjust_month' || menuViewMode === 'list') ? (
             <div className="flex-1 flex overflow-hidden bg-slate-100">
               <MenuAdjustListView
                 records={menuAdjustRecords}
@@ -834,7 +842,10 @@ export default function PMSDashboardPage() {
             <main className="flex-1 flex flex-col overflow-hidden bg-white">
               {/* Dải điều khiển tài chính & thao tác hợp nhất siêu gọn chuẩn QLMN */}
               <FinancialSummaryStrip
-                onBackToList={() => setMenuViewMode('list')}
+                onBackToList={() => {
+                  setActivePmsModule('nutrition_adjust_month');
+                  setMenuViewMode('list');
+                }}
                 schoolName={currentPlan.schoolName}
                 segmentLabel={currentSegment === 'maugiao' ? 'Mẫu giáo' : currentSegment === 'nhatre' ? 'Nhà trẻ' : 'Ăn sáng'}
                 date={selectedDate}
