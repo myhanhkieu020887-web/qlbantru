@@ -22,13 +22,14 @@ import { UserRole, ROLE_PERMISSIONS } from '../types/auth';
 import { SyncStatus, checkSupabaseConnection } from '../lib/supabase/client';
 import { saveDailyMenuToSupabase, saveAttendanceToSupabase } from '../lib/supabase/repository';
 
-// New Clean Layout & View Components
 import { TopNavBar, AppTab } from '../components/navigation/TopNavBar';
 import { LeftSidebarPanel } from '../components/layout/LeftSidebarPanel';
 import { AttendanceView } from '../components/views/AttendanceView';
 import { SmartPOView } from '../components/views/SmartPOView';
 import { FoodSafetyView } from '../components/views/FoodSafetyView';
 import { NutritionGrid } from '../components/grid/NutritionGrid';
+import { FinancialSummaryStrip } from '../components/grid/FinancialSummaryStrip';
+import { NutritionMatrixFooter } from '../components/metrics/NutritionMatrixFooter';
 
 // Modals & Drawers
 import { AddFoodModal } from '../components/dialogs/AddFoodModal';
@@ -558,7 +559,32 @@ export default function PMSDashboardPage() {
                 </div>
               )}
 
-              {/* Lưới Kế toán 13 cột toàn màn hình cuộn mượt mà */}
+              {/* Dải thông số tài chính chuẩn QLMN (Số trẻ, Tiền 1 trẻ, Tổng thu, Tiền dịch vụ, Tiền bổ trợ, Tiền ăn, Chênh lệch) */}
+              <FinancialSummaryStrip
+                date={selectedDate}
+                onDateChange={(d) => setSelectedDate(d)}
+                studentCount={currentPlan.studentCount}
+                onStudentCountChange={(cnt) =>
+                  updateCurrentPlan((p) => ({ ...p, studentCount: cnt }))
+                }
+                mealPricePerChild={currentPlan.mealPricePerChild}
+                onMealPriceChange={(pr) =>
+                  updateCurrentPlan((p) => ({ ...p, mealPricePerChild: pr }))
+                }
+                serviceFee={currentPlan.serviceFee || 0}
+                subsidyFee={currentPlan.subsidyFee || 0}
+                initialDifference={currentPlan.initialDifference || 0}
+                totalCost={totals.totalCost}
+                onSave={() => {
+                  triggerCloudSync();
+                  showToast('Đã lưu dữ liệu thực đơn thành công', 'success');
+                }}
+                onPrint={() => window.print()}
+                onSaveTemplate={() => showToast('Đã lưu thành thực đơn mẫu chuẩn', 'success')}
+                isLocked={isLocked}
+              />
+
+              {/* Lưới Kế toán 13 cột toàn màn hình cuộn mượt mà (Có Mã TP, Vạch trạng thái, Nhóm món) */}
               <NutritionGrid
                 items={computedItems}
                 totals={totals}
@@ -567,6 +593,15 @@ export default function PMSDashboardPage() {
                 onUpdateGam={handleUpdateGam}
                 onToggleFixed={handleToggleFixed}
                 onRemoveItem={handleRemoveItem}
+              />
+
+              {/* Chân trang Ma trận Dinh dưỡng 7 dòng + Phân bổ Calo từng bữa + Thẻ Đánh giá Lượng/Chất + Nút cam Cân đối thực đơn */}
+              <NutritionMatrixFooter
+                computedItems={computedItems}
+                totals={totals}
+                ageGroup={currentSegment}
+                onRunSolver={handleRunSolver}
+                isSolving={isSolving}
               />
             </main>
           </>

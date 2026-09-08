@@ -43,6 +43,7 @@ export interface FoodItem {
   vitaminCMg?: number;
   isFixed?: boolean;
   allergens?: AllergenType[];
+  inventoryStatus?: 'con_kho' | 'sap_het' | 'da_het' | 'di_cho';
 }
 
 export type AgeGroup = 'maugiao' | 'nhatre' | 'ansang';
@@ -57,8 +58,21 @@ export interface MenuItem {
   food: FoodItem;
   mealSession: MealSession;
   gamPerChild: number;
+  dishId?: string;
+  dishName?: string;
   note?: string;
   isFixed?: boolean;
+}
+
+export interface MealCaloEvaluation {
+  session: MealSession;
+  sessionLabel: string;
+  calo: number;
+  actualPct: number;
+  standardMinPct: number;
+  standardMaxPct: number;
+  caloSharePct: number;
+  isPass: boolean;
 }
 
 export interface ComputedMenuItem extends MenuItem {
@@ -142,6 +156,8 @@ export interface DailyMenuPlan {
   studentCount: number;
   mealPricePerChild: number;
   serviceFee: number;
+  subsidyFee?: number;
+  initialDifference?: number;
   menuCode: string;
   menuTitle: {
     sang?: string;

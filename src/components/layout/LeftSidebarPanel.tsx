@@ -135,50 +135,83 @@ export const LeftSidebarPanel: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* 2. PHÂN HỆ BÁN TRÚ & THÔNG SỐ */}
+      {/* 2. PHÂN HỆ BÁN TRÚ (NHÓM TRẺ - THỰC ĐƠN CHUẨN QLMN) */}
       <div className="bg-white rounded-xl p-3 border border-slate-200/80 shadow-xs space-y-2.5">
-        <div>
-          <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-            PHÂN HỆ BÁN TRÚ
+        <div className="flex items-center justify-between">
+          <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+            NHÓM TRẺ - THỰC ĐƠN
           </label>
-          <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-lg">
+          <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => onSegmentChange('maugiao')}
-              className={`py-1 rounded-md text-[11px] font-bold text-center transition-all ${
-                currentSegment === 'maugiao'
-                  ? 'bg-white text-blue-800 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className="px-2 py-0.5 rounded bg-orange-500 hover:bg-orange-600 text-white font-bold text-[10px] shadow-xs transition-colors"
+              title="Tổng hợp các nhóm trẻ"
             >
-              Mẫu giáo
+              Tổng hợp
             </button>
             <button
               type="button"
-              onClick={() => onSegmentChange('nhatre')}
-              className={`py-1 rounded-md text-[11px] font-bold text-center transition-all ${
-                currentSegment === 'nhatre'
-                  ? 'bg-white text-blue-800 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] shadow-xs transition-colors"
+              title="Thêm thực đơn nhóm trẻ"
             >
-              Nhà trẻ
-            </button>
-            <button
-              type="button"
-              onClick={() => onSegmentChange('ansang')}
-              className={`py-1 rounded-md text-[11px] font-bold text-center transition-all ${
-                currentSegment === 'ansang'
-                  ? 'bg-white text-blue-800 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Ăn sáng
+              + Thêm
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+        {/* Danh sách 3 nhóm trẻ có số lượng cháu chuẩn QLMN */}
+        <div className="space-y-1">
+          <button
+            type="button"
+            onClick={() => onSegmentChange('nhatre')}
+            className={`w-full px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs transition-all border ${
+              currentSegment === 'nhatre'
+                ? 'bg-blue-50/90 border-blue-300 text-blue-950 font-bold shadow-xs'
+                : 'bg-white border-slate-100 hover:bg-slate-50 text-slate-700'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-5 text-center font-mono font-bold text-slate-400">1.</span>
+              <span>Nhà trẻ</span>
+            </div>
+            <span className="font-mono text-slate-500 font-semibold">(0)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSegmentChange('maugiao')}
+            className={`w-full px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs transition-all border ${
+              currentSegment === 'maugiao'
+                ? 'bg-blue-50/90 border-blue-300 text-blue-950 font-bold shadow-xs'
+                : 'bg-white border-slate-100 hover:bg-slate-50 text-slate-700'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-5 text-center font-mono font-bold text-blue-600">2.</span>
+              <span className="font-bold">Mẫu giáo</span>
+            </div>
+            <span className="font-mono text-blue-700 font-bold">({studentCount})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSegmentChange('ansang')}
+            className={`w-full px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs transition-all border ${
+              currentSegment === 'ansang'
+                ? 'bg-blue-50/90 border-blue-300 text-blue-950 font-bold shadow-xs'
+                : 'bg-white border-slate-100 hover:bg-slate-50 text-slate-700'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-5 text-center font-mono font-bold text-slate-400">3.</span>
+              <span>Ăn sáng</span>
+            </div>
+            <span className="font-mono text-slate-500 font-semibold">(0)</span>
+          </button>
+        </div>
+
+        {/* Cấu hình Sĩ số và Đơn giá */}
+        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
           <div>
             <label className="block text-[10px] font-semibold text-slate-500 uppercase">SĨ SỐ ĂN (CHÁU)</label>
             <input
@@ -203,6 +236,81 @@ export const LeftSidebarPanel: React.FC<Props> = ({
           </div>
         </div>
       </div>
+
+      {/* 3. KHỐI CÂY MÓN ĂN THEO BỮA (THÔNG TIN THỰC ĐƠN CHUẨN QLMN) */}
+      <div className="bg-white rounded-xl p-3 border border-slate-200/80 shadow-xs space-y-2">
+        <div className="flex items-center justify-between mb-1">
+          <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+            THÔNG TIN THỰC ĐƠN
+          </label>
+          <span className="text-[10px] text-slate-400">Cây món ăn</span>
+        </div>
+
+        <div className="space-y-1.5 text-xs">
+          {/* Bữa sáng */}
+          <div className="rounded-lg border border-slate-200 overflow-hidden">
+            <div className="bg-amber-50/60 px-2.5 py-1 flex items-center justify-between font-bold text-amber-950 text-[11px]">
+              <span>Bữa sáng</span>
+              <button type="button" className="text-amber-700 hover:text-amber-900 font-bold px-1 rounded">+</button>
+            </div>
+          </div>
+
+          {/* Bữa trưa */}
+          <div className="rounded-lg border border-blue-200 overflow-hidden">
+            <div className="bg-blue-50 px-2.5 py-1 flex items-center justify-between font-bold text-blue-950 text-[11px]">
+              <span>Bữa trưa</span>
+              <button type="button" className="text-blue-700 hover:text-blue-900 font-bold px-1 rounded">+</button>
+            </div>
+            <div className="px-3 py-1.5 bg-white space-y-1 text-[11px] text-slate-700 border-t border-blue-100">
+              <div className="flex items-center gap-1.5">
+                <span className="text-blue-500">•</span>
+                <span className="font-semibold text-slate-800">Cơm:</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-blue-500">•</span>
+                <span>Canh tần ô tôm</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-blue-500">•</span>
+                <span>Xíu mại</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bữa xế */}
+          <div className="rounded-lg border border-emerald-200 overflow-hidden">
+            <div className="bg-emerald-50 px-2.5 py-1 flex items-center justify-between font-bold text-emerald-950 text-[11px]">
+              <span>Bữa xế</span>
+              <button type="button" className="text-emerald-700 hover:text-emerald-900 font-bold px-1 rounded">+</button>
+            </div>
+            <div className="px-3 py-1 bg-white text-[11px] text-slate-700 border-t border-emerald-100">
+              <div className="flex items-center gap-1.5">
+                <span className="text-emerald-500">•</span>
+                <span>Súp bắp thịt heo</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bữa phụ */}
+          <div className="rounded-lg border border-purple-200 overflow-hidden">
+            <div className="bg-purple-50 px-2.5 py-1 flex items-center justify-between font-bold text-purple-950 text-[11px]">
+              <span>Bữa phụ</span>
+              <button type="button" className="text-purple-700 hover:text-purple-900 font-bold px-1 rounded">+</button>
+            </div>
+            <div className="px-3 py-1.5 bg-white space-y-1 text-[11px] text-slate-700 border-t border-purple-100">
+              <div className="flex items-center gap-1.5">
+                <span className="text-purple-500">•</span>
+                <span>Chuối già</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-purple-500">•</span>
+                <span>Sữa Metacare</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
 
       {/* 3. 4 THẺ KPI DINH DƯỠNG & KIỂM SOÁT PHÁP LÝ */}
       <div className="space-y-2">

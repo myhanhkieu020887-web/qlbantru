@@ -1,4 +1,4 @@
-import { ComputedMenuItem, MenuItem, NutritionTotals, AgeGroup } from '../types/nutrition';
+import { ComputedMenuItem, MenuItem, NutritionTotals, AgeGroup, MealCaloEvaluation, MealSession } from '../types/nutrition';
 
 /**
  * Tính toán dinh dưỡng chi tiết cho từng nguyên liệu trong thực đơn theo hệ số Atwater
@@ -222,4 +222,58 @@ export function computeNutritionTotals(
       compliancePassed,
     },
   };
+}
+
+/**
+ * Đánh giá tỷ lệ calo từng bữa ăn theo chuẩn QLMN & TT 51/2020
+ */
+export function evaluateMealCaloDistribution(
+  computedItems: ComputedMenuItem[],
+  totalCalo: number,
+  ageGroup: AgeGroup = 'maugiao'
+): MealCaloEvaluation[] {
+  const isMG = ageGroup === 'maugiao';
+  const fullDayCalo = isMG ? 1300 : 1000;
+
+  const sessions: {
+    session: MealSession;
+    sessionLabel: string;
+    standardMinPct: number;
+    standardMaxPct: number;
+  }[] = [
+    { session: 'sang', sessionLabel: 'Bữa sáng', standardMinPct: 15, standardMaxPct: 20 },
+    { session: 'chinh_trua', sessionLabel: 'Bữa trưa', standardMinPct: 30, standardMaxPct: 35 },
+    { session: 'xe', sessionLabel: 'Bữa xế', standardMinPct: 25, standardMaxPct: 30 },
+    { session: 'phu_trua', sessionLabel: 'Bữa phụ', standardMinPct: 5, standardMaxPct: 10 },
+  ];
+
+  const caloMap: Record<string, number> = {
+    sang: 0,
+    chinh_trua: 0,
+    phu_trua: 0,
+    xe: 0,
+    phu_xe: 0,
+  };
+
+  for (const it of computedItems) {
+    caloMap[it.mealSession] = (caloMap[it.mealSession] || 0) + it.calo;
+  }
+
+  return sessions.map((s) => {
+    const sessionCalo = caloMap[s.session] || 0;
+    const actualPct = Math.round((sessionCalo / fullDayCalo) * 10000) / 100;
+    const caloSharePct = totalCalo > 0 ? Math.round((sessionCalo / totalCalo) * 10000) / 100 : 0;
+    const isPass = actualPct >= s.standardMinPct && actualPct <= s.standardMaxPct;
+
+    return {
+      session: s.session,
+      sessionLabel: s.sessionLabel,
+      calo: Math.round(sessionCalo * 10) / 10,
+      actualPct,
+      standardMinPct: s.standardMinPct,
+      standardMaxPct: s.standardMaxPct,
+      caloSharePct,
+      isPass,
+    };
+  });
 }
