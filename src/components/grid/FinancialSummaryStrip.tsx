@@ -1,8 +1,7 @@
 'use client';
 
-import React from 'react';
 import { formatCurrency, formatNumber } from '../../lib/utils';
-import { MenuStatus } from '../../types/nutrition';
+import { MenuStatus, SchoolBranch } from '../../types/nutrition';
 import {
   Calendar,
   Save,
@@ -15,6 +14,7 @@ import {
   Users,
   Building2,
   Lock,
+  GitBranch,
 } from 'lucide-react';
 
 interface Props {
@@ -28,6 +28,9 @@ interface Props {
   canLockMenu?: boolean;
   studentCount: number;
   onStudentCountChange: (count: number) => void;
+  branchInput?: string;
+  onBranchInputChange?: (input: string) => void;
+  branches?: SchoolBranch[];
   mealPricePerChild: number;
   onMealPriceChange: (price: number) => void;
   serviceFee?: number;
@@ -54,6 +57,9 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
   canLockMenu = true,
   studentCount,
   onStudentCountChange,
+  branchInput,
+  onBranchInputChange,
+  branches = [],
   mealPricePerChild,
   onMealPriceChange,
   serviceFee = 0,
@@ -185,16 +191,37 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-1 border-t border-[#dbeef0] text-[11px]">
         {/* Sĩ số và mức tiền */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1">
-            <span className="text-slate-600 font-medium">Số trẻ:</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-600 font-medium flex items-center gap-1">
+              <Users className="w-3 h-3 text-slate-400" />
+              <span>Số trẻ:</span>
+            </span>
             <input
-              type="number"
-              value={studentCount}
-              onChange={(e) => onStudentCountChange(Math.max(0, parseInt(e.target.value) || 0))}
+              type="text"
+              value={branchInput !== undefined ? branchInput : studentCount.toString()}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (onBranchInputChange) {
+                  onBranchInputChange(val);
+                } else {
+                  const parsed = parseInt(val) || 0;
+                  onStudentCountChange(Math.max(0, parsed));
+                }
+              }}
               disabled={isLocked}
-              className="w-14 bg-white border border-[#c8e2bd] rounded px-1 py-0.2 text-[11px] font-mono font-bold text-slate-900 text-center focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              placeholder="VD: 282;116"
+              title="Nhập số trẻ cho từng điểm trường ngăn cách bằng dấu chấm phẩy (VD: 282;116)"
+              className="w-24 bg-white border border-[#c8e2bd] rounded px-1.5 py-0.2 text-[11px] font-mono font-bold text-slate-900 text-center focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
-            <span className="text-[10px] text-slate-400">cháu</span>
+            {/* Hiển thị tổng số trẻ và phân bổ các điểm trường */}
+            <span className="font-mono font-bold text-emerald-800 bg-emerald-100/70 px-1.5 py-0.2 rounded border border-emerald-300 text-[10.5px]">
+              {studentCount} trẻ
+            </span>
+            {branches.length > 1 && (
+              <span className="text-[10px] text-slate-500 hidden xl:inline font-mono">
+                ({branches.map(b => `${b.code}: ${b.studentCount}`).join(', ')})
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1">

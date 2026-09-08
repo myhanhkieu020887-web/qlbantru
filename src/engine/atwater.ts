@@ -1,11 +1,15 @@
-import { ComputedMenuItem, MenuItem, NutritionTotals, AgeGroup, MealCaloEvaluation, MealSession } from '../types/nutrition';
+import { ComputedMenuItem, MenuItem, NutritionTotals, AgeGroup, MealCaloEvaluation, MealSession, SchoolBranch } from '../types/nutrition';
 
 /**
  * Tính toán dinh dưỡng chi tiết cho từng nguyên liệu trong thực đơn theo hệ số Atwater
  * Hệ số bảo toàn năng lượng:
  * Calo = (Protein * 4) + (Lipid * 9) + (Glucid * 4)
  */
-export function computeMenuItem(item: MenuItem, studentCount: number): ComputedMenuItem {
+export function computeMenuItem(
+  item: MenuItem,
+  studentCount: number,
+  branches?: SchoolBranch[]
+): ComputedMenuItem {
   const { food, gamPerChild } = item;
   const waste = food.wasteFactor || 0;
 
@@ -30,9 +34,30 @@ export function computeMenuItem(item: MenuItem, studentCount: number): ComputedM
   }
 
   // Quy đổi thực mua theo Đơn vị tính (ĐVT)
-  const actualBuyUnit = food.gamExchange > 0 
+  let actualBuyUnit = food.gamExchange > 0 
     ? (actualBuyKg * 1000) / food.gamExchange 
     : actualBuyKg;
+
+  // Phân bổ cho từng điểm trường (Đ1, Đ2...) - Yêu cầu: Thực mua ở điểm trường luôn là số nguyên
+  const branchBuyUnits: Record<string, number> = {};
+  if (branches && branches.length > 0) {
+    let sumBranches = 0;
+    branches.forEach((b) => {
+      if (item.branchQuantities && item.branchQuantities[b.id] !== undefined) {
+        branchBuyUnits[b.id] = Math.round(item.branchQuantities[b.id]);
+      } else {
+        const ratio = studentCount > 0 ? b.studentCount / studentCount : 0;
+        const rawVal = actualBuyUnit * ratio;
+        // Thực mua tại điểm trường luôn là số nguyên
+        branchBuyUnits[b.id] = Math.round(rawVal);
+      }
+      sumBranches += branchBuyUnits[b.id];
+    });
+
+    // Cập nhật tổng thực mua theo số nguyên của các điểm trường
+    actualBuyUnit = sumBranches;
+    actualBuyKg = food.gamExchange > 0 ? (actualBuyUnit * food.gamExchange) / 1000 : actualBuyUnit;
+  }
 
   // Thành tiền cả trường
   const totalPrice = actualBuyUnit * food.price;
@@ -64,6 +89,7 @@ export function computeMenuItem(item: MenuItem, studentCount: number): ComputedM
     actualEatKg,
     actualBuyKg,
     actualBuyUnit,
+    branchBuyUnits,
     unitPrice: food.price,
     totalPrice,
     proteinAnimal,
@@ -88,9 +114,10 @@ export function computeNutritionTotals(
   items: MenuItem[],
   studentCount: number,
   budgetPerChild: number,
-  ageGroup: AgeGroup = 'maugiao'
+  ageGroup: AgeGroup = 'maugiao',
+  branches?: SchoolBranch[]
 ): { computedItems: ComputedMenuItem[]; totals: NutritionTotals } {
-  const computedItems = items.map((it) => computeMenuItem(it, studentCount));
+  const computedItems = items.map((it) => computeMenuItem(it, studentCount, branches));
 
   let totalCost = 0;
   let proteinAnimalG = 0;

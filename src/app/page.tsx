@@ -11,6 +11,7 @@ import {
   MealSession,
   MenuStatus,
   FoodSafetyAuditRecord,
+  SchoolBranch,
 } from '../types/nutrition';
 import { SEED_WEEKLY_SCHEDULE } from '../data/seed-weekly-schedule';
 import { SEED_CLASS_ATTENDANCE } from '../data/seed-attendance';
@@ -56,6 +57,25 @@ export default function PMSDashboardPage() {
   // 3. Quản lý 3 Phân hệ: Mẫu giáo | Nhà trẻ | Ăn sáng
   const [currentSegment, setCurrentSegment] = useState<AgeGroup>('maugiao');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+
+  // 3.1 Quản lý Điểm trường (Branch Multi-site: e.g. "282;116")
+  const [branchInput, setBranchInput] = useState<string>('282;116');
+
+  const branches: SchoolBranch[] = React.useMemo(() => {
+    if (!branchInput || !branchInput.trim()) return [];
+    return branchInput
+      .split(';')
+      .map((s, idx) => {
+        const cnt = parseInt(s.trim(), 10);
+        return {
+          id: `branch_${idx + 1}`,
+          code: `Đ${idx + 1}`,
+          name: `Điểm ${idx + 1}`,
+          studentCount: isNaN(cnt) ? 0 : cnt,
+        };
+      })
+      .filter((b) => b.studentCount > 0);
+  }, [branchInput]);
 
   // 4. Quản lý Điểm danh 9 lớp học
   const [attendanceData, setAttendanceData] = useState<ClassAttendanceItem[]>(SEED_CLASS_ATTENDANCE);
@@ -106,7 +126,8 @@ export default function PMSDashboardPage() {
     currentPlan.items,
     currentPlan.studentCount,
     currentPlan.mealPricePerChild,
-    currentPlan.ageGroup
+    currentPlan.ageGroup,
+    branches
   );
 
   // Hàm kích hoạt đồng bộ Supabase Cloud (Optimistic UI + Background Sync)
@@ -213,6 +234,44 @@ export default function PMSDashboardPage() {
       ),
       status: prev.status === 'APPROVED' ? 'DRAFT' : prev.status,
     }));
+  };
+
+  // Cập nhật số nguyên thực mua theo từng điểm trường (VD: Đ1=28, Đ2=12 -> Tổng=40)
+  const handleUpdateBranchBuy = (itemId: string, branchId: string, newQty: number) => {
+    if (currentPlan.status === 'LOCKED') return;
+    const roundedQty = Math.max(0, Math.round(newQty));
+    updateCurrentPlan((prev) => {
+      const newItems = prev.items.map((it) => {
+        if (it.id !== itemId) return it;
+        const currentBranchQtys = it.branchQuantities ? { ...it.branchQuantities } : {};
+        currentBranchQtys[branchId] = roundedQty;
+        // Tổng mua điểm trường = tổng số nguyên các điểm
+        const customTotal = Object.values(currentBranchQtys).reduce((sum, v) => sum + v, 0);
+        return {
+          ...it,
+          branchQuantities: currentBranchQtys,
+          customTotalBuy: customTotal,
+        };
+      });
+      return {
+        ...prev,
+        items: newItems,
+        status: prev.status === 'APPROVED' ? 'DRAFT' : prev.status,
+      };
+    });
+  };
+
+  // Thay đổi chuỗi điểm trường (VD: "282;116")
+  const handleBranchInputChange = (newVal: string) => {
+    setBranchInput(newVal);
+    const parts = newVal
+      .split(';')
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => !isNaN(n) && n > 0);
+    if (parts.length > 0) {
+      const sum = parts.reduce((a, b) => a + b, 0);
+      updateCurrentPlan((p) => ({ ...p, studentCount: sum }));
+    }
   };
 
   // Khóa / Mở khóa cố định nguyên liệu
@@ -486,6 +545,9 @@ export default function PMSDashboardPage() {
                 onStudentCountChange={(cnt) =>
                   updateCurrentPlan((p) => ({ ...p, studentCount: cnt }))
                 }
+                branchInput={branchInput}
+                onBranchInputChange={handleBranchInputChange}
+                branches={branches}
                 mealPricePerChild={currentPlan.mealPricePerChild}
                 onMealPriceChange={(pr) =>
                   updateCurrentPlan((p) => ({ ...p, mealPricePerChild: pr }))
@@ -530,9 +592,11 @@ export default function PMSDashboardPage() {
               <NutritionGrid
                 items={computedItems}
                 totals={totals}
+                branches={branches}
                 isLocked={isLocked}
                 canEditNutrients={rolePerm.canEditNutrients}
                 onUpdateGam={handleUpdateGam}
+                onUpdateBranchBuy={handleUpdateBranchBuy}
                 onToggleFixed={handleToggleFixed}
                 onRemoveItem={handleRemoveItem}
               />

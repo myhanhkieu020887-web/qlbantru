@@ -52,6 +52,13 @@ export type MealSession = 'sang' | 'chinh_trua' | 'phu_trua' | 'xe' | 'phu_xe';
 
 export type MenuStatus = 'DRAFT' | 'OPTIMIZED' | 'APPROVED' | 'LOCKED';
 
+export interface SchoolBranch {
+  id: string;
+  code: string; // VD: 'Đ1', 'Đ2'
+  name: string; // VD: 'Điểm 1', 'Điểm 2'
+  studentCount: number;
+}
+
 export interface MenuItem {
   id: string;
   foodId: string;
@@ -62,6 +69,8 @@ export interface MenuItem {
   dishName?: string;
   note?: string;
   isFixed?: boolean;
+  branchQuantities?: Record<string, number>;
+  customTotalBuy?: number;
 }
 
 export interface MealCaloEvaluation {
@@ -79,6 +88,7 @@ export interface ComputedMenuItem extends MenuItem {
   actualEatKg: number;
   actualBuyKg: number;
   actualBuyUnit: number;
+  branchBuyUnits?: Record<string, number>;
   unitPrice: number;
   totalPrice: number;
   proteinAnimal: number;
