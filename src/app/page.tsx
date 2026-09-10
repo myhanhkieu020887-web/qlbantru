@@ -81,6 +81,21 @@ import { MenuTemplateItem } from '../types/menu-template';
 // Print Preview Modal (A4 Print Preview)
 import { PrintPreviewModal } from '../components/dialogs/PrintPreviewModal';
 
+// Supplier & Invoices (Quy trình công nợ 3 bước & Multi-campus)
+import { SupplierListView } from '../components/views/SupplierListView';
+import {
+  SupplierContract,
+  SupplierDeliveryNote,
+  SupplierMonthlyReconciliation,
+  SupplierPaymentVoucher,
+} from '../types/supplier-invoice';
+import {
+  SEED_SUPPLIER_CONTRACTS,
+  SEED_DELIVERY_NOTES,
+  SEED_MONTHLY_RECONCILIATIONS,
+  SEED_PAYMENT_VOUCHERS,
+} from '../data/seed-suppliers-debt';
+
 // Icons
 import { Sparkles, PlusCircle, FileSpreadsheet, Copy, Lock, Unlock, Printer } from 'lucide-react';
 
@@ -101,8 +116,9 @@ export default function PMSDashboardPage() {
   const [currentSegment, setCurrentSegment] = useState<AgeGroup>('maugiao');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
 
-  // 3.1 Quản lý Điểm trường (Branch Multi-site: e.g. "282;116")
-  const [branchInput, setBranchInput] = useState<string>('282;116');
+  // 3.1 Quản lý Điểm trường (Branch Multi-site: e.g. "850;360" - Đ1: Cơ sở chính 850 trẻ; Đ2: Phân hiệu 360 trẻ)
+  const [branchInput, setBranchInput] = useState<string>('850;360');
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
 
   const branches: SchoolBranch[] = React.useMemo(() => {
     if (!branchInput || !branchInput.trim()) return [];
@@ -110,10 +126,11 @@ export default function PMSDashboardPage() {
       .split(';')
       .map((s, idx) => {
         const cnt = parseInt(s.trim(), 10);
+        const isFirst = idx === 0;
         return {
           id: `branch_${idx + 1}`,
           code: `Đ${idx + 1}`,
-          name: `Điểm ${idx + 1}`,
+          name: isFirst ? `Cơ sở chính (Đ1)` : `Phân hiệu (Đ2)`,
           studentCount: isNaN(cnt) ? 0 : cnt,
         };
       })
@@ -154,6 +171,12 @@ export default function PMSDashboardPage() {
 
   // 12. Quản lý Thư viện Thực đơn mẫu (Chuẩn qlmn.vn/menu_planning/list)
   const [menuTemplates, setMenuTemplates] = useState<MenuTemplateItem[]>(SEED_MENU_TEMPLATES);
+
+  // 13. Quản lý Nhà cung cấp & Quy trình Công nợ 3 bước
+  const [supplierContracts, setSupplierContracts] = useState<SupplierContract[]>(SEED_SUPPLIER_CONTRACTS);
+  const [deliveryNotes, setDeliveryNotes] = useState<SupplierDeliveryNote[]>(SEED_DELIVERY_NOTES);
+  const [monthlyReconciliations, setMonthlyReconciliations] = useState<SupplierMonthlyReconciliation[]>(SEED_MONTHLY_RECONCILIATIONS);
+  const [paymentVouchers, setPaymentVouchers] = useState<SupplierPaymentVoucher[]>(SEED_PAYMENT_VOUCHERS);
 
   // 6. Modals & Toast
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -805,6 +828,22 @@ export default function PMSDashboardPage() {
     }
   };
 
+  // Chuyển đổi điểm trường (Multi-campus Switcher)
+  const handleBranchSelect = (branchId: string) => {
+    setSelectedBranchId(branchId);
+    if (branchId === 'all') {
+      const totalAll = branches.reduce((sum, b) => sum + b.studentCount, 0) || 1210;
+      updateCurrentPlan((p) => ({ ...p, studentCount: totalAll, branchId: 'all' }));
+      showToast(`Đã chuyển sang chế độ: Toàn trường (${totalAll} trẻ)`, 'info');
+    } else {
+      const targetBranch = branches.find((b) => b.id === branchId);
+      const count = targetBranch ? targetBranch.studentCount : 850;
+      const bName = targetBranch ? targetBranch.name : 'Điểm trường';
+      updateCurrentPlan((p) => ({ ...p, studentCount: count, branchId }));
+      showToast(`Đã chuyển sang lọc: ${bName} (${count} trẻ)`, 'info');
+    }
+  };
+
   // Co giãn định lượng nhanh theo nhóm thực phẩm (Scaling Factor)
   const handleScaleNutrientGroup = (category: 'protein' | 'carbs' | 'fat' | 'veg', percent: number) => {
     const factor = 1 + percent / 100;
@@ -1042,6 +1081,8 @@ export default function PMSDashboardPage() {
                 onStudentCountChange={(cnt) =>
                   updateCurrentPlan((p) => ({ ...p, studentCount: cnt }))
                 }
+                selectedBranchId={selectedBranchId}
+                onBranchSelect={handleBranchSelect}
                 branchInput={branchInput}
                 onBranchInputChange={handleBranchInputChange}
                 branches={branches}
@@ -1159,13 +1200,23 @@ export default function PMSDashboardPage() {
           />
         )}
 
-        {/* VIEW 6: KẾ TOÁN TÀI CHÍNH (C38-HD & 02-TT) */}
+        {/* VIEW 6: KẾ TOÁN TÀI CHÍNH HOẶC QUẢN LÝ NHÀ CUNG CẤP & CÔNG NỢ 3 BƯỚC */}
         {activeTab === 'finance' && (
-          <FinanceView
-            settlements={settlements}
-            suppliersDebt={suppliersDebt}
-            onRecordSupplierPayment={handleRecordSupplierPayment}
-          />
+          activePmsModule === 'suppliers' ? (
+            <SupplierListView
+              contracts={supplierContracts}
+              deliveryNotes={deliveryNotes}
+              reconciliations={monthlyReconciliations}
+              paymentVouchers={paymentVouchers}
+              onShowToast={showToast}
+            />
+          ) : (
+            <FinanceView
+              settlements={settlements}
+              suppliersDebt={suppliersDebt}
+              onRecordSupplierPayment={handleRecordSupplierPayment}
+            />
+          )
         )}
       </div>
 

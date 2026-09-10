@@ -18,6 +18,7 @@ import {
   ArrowLeft,
   Sparkles,
 } from 'lucide-react';
+import { BranchSwitcher } from '../navigation/BranchSwitcher';
 
 interface Props {
   onBackToList?: () => void;
@@ -31,6 +32,8 @@ interface Props {
   canLockMenu?: boolean;
   studentCount: number;
   onStudentCountChange: (count: number) => void;
+  selectedBranchId?: string;
+  onBranchSelect?: (branchId: string) => void;
   branchInput?: string;
   onBranchInputChange?: (input: string) => void;
   branches?: SchoolBranch[];
@@ -62,6 +65,8 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
   canLockMenu = true,
   studentCount,
   onStudentCountChange,
+  selectedBranchId = 'all',
+  onBranchSelect,
   branchInput,
   onBranchInputChange,
   branches = [],
@@ -90,7 +95,7 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
     <div className="bg-[#f7faf5] border-b border-[#c8e2bd] px-3 py-1.5 text-xs text-slate-800 select-none shrink-0 shadow-xs space-y-1">
       {/* HÀNG 1: TÊN ĐƠN VỊ, TRẠNG THÁI & CỤM NÚT HÀNH ĐỘNG */}
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-        {/* Bên trái: Trường, Ngày, Phân hệ, Trạng thái */}
+        {/* Bên trái: Trường, Ngày, Phân hệ, Trạng thái & Chuyển cơ sở */}
         <div className="flex items-center gap-2 flex-wrap">
           {onBackToList && (
             <button
@@ -139,6 +144,16 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
               <option value="LOCKED" disabled={!canLockMenu}>🔒 Khóa sổ</option>
             </select>
           </div>
+
+          {/* Bộ chọn cơ sở / điểm trường Multi-campus */}
+          {branches.length > 0 && onBranchSelect && (
+            <BranchSwitcher
+              selectedBranchId={selectedBranchId}
+              onBranchChange={onBranchSelect}
+              branches={branches}
+              totalStudents={branches.reduce((sum, b) => sum + b.studentCount, 0) || studentCount}
+            />
+          )}
         </div>
 
         {/* Bên phải: Cụm nút hành động nhanh */}

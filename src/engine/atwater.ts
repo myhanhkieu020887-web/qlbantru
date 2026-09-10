@@ -68,8 +68,9 @@ export function computeMenuItem(
     actualBuyKg = food.gamExchange > 0 ? (actualBuyUnit * food.gamExchange) / 1000 : actualBuyUnit;
   }
 
-  // Thành tiền cả trường
-  const totalPrice = actualBuyUnit * food.price;
+  // Thành tiền cả trường (Ưu tiên giá hợp đồng nhà cung cấp nếu có)
+  const effectivePrice = food.contractPrice && food.contractPrice > 0 ? food.contractPrice : food.price;
+  const totalPrice = actualBuyUnit * effectivePrice;
 
   // Dinh dưỡng tính trên 1 trẻ (gamPerChild / 100)
   const factor = gamPerChild / 100;

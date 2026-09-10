@@ -4,52 +4,57 @@ import { formatNumber, formatCurrency } from '@/lib/utils';
 export const REGISTERED_SUPPLIERS: Record<SupplierType, SupplierInfo> = {
   thit_ca: {
     id: 'thit_ca',
-    name: 'Công ty Thực phẩm Tươi Sống Hưng Thịnh',
-    categoryName: 'Thịt bò, Thịt heo, Thủy hải sản & Trứng tươi',
+    name: 'Công ty CP Chăn nuôi C.P. Việt Nam',
+    categoryName: 'Thịt heo, Thịt gà & Trứng tươi CP (kèm Hải sản Biển Đông)',
     deliveryTime: '06:00 sáng',
-    contactName: 'Anh Hưng (Đội xe tươi sống)',
-    phone: '0913.456.789',
+    contactName: 'Anh Trung (Điều phối giao nhận C.P)',
+    phone: '028.3821.2368',
     iconName: 'Beef',
   },
   rau_cu: {
     id: 'rau_cu',
-    name: 'HTX Nông sản Rau Củ Sạch Hàm Thắng (VietGAP)',
-    categoryName: 'Rau xanh, Củ quả tươi & Nấm rơm',
-    deliveryTime: '06:15 sáng',
-    contactName: 'Chị Mai (Vựa rau sạch)',
-    phone: '0988.123.456',
+    name: 'HTX Nông nghiệp Rau an toàn VietGAP Hàm Thắng',
+    categoryName: 'Rau xanh, Củ quả tươi & Nấm rơm VietGAP',
+    deliveryTime: '05:45 sáng',
+    contactName: 'Chị Ngọc (Vựa rau VietGAP)',
+    phone: '0252.386.0000',
     iconName: 'Carrot',
   },
   gia_vi: {
     id: 'gia_vi',
-    name: 'Đại lý Bách Hóa & Thực Phẩm Khô Minh Phát',
-    categoryName: 'Gia vị, Nước mắm, Dầu ăn & Đồ khô',
-    deliveryTime: '06:30 sáng',
-    contactName: 'Anh Phát (Giao hàng khô)',
-    phone: '0903.789.123',
+    name: 'Cửa hàng Bách hóa Tổng hợp Minh Phát',
+    categoryName: 'Gia vị, Nước mắm, Dầu ăn Neptune & Đồ khô',
+    deliveryTime: '06:45 sáng',
+    contactName: 'Anh Phát (Chủ cửa hàng bách hóa)',
+    phone: '0252.386.5432',
     iconName: 'Container',
   },
   sua_banh: {
     id: 'sua_banh',
-    name: 'Chi nhánh Sữa & Trái cây Tươi Bình Thuận',
-    categoryName: 'Sữa chua Susu, Bánh & Trái cây tráng miệng',
-    deliveryTime: '08:30 sáng',
-    contactName: 'Chị Lan (Điều phối sữa & quả)',
-    phone: '0937.654.321',
+    name: 'NPP Sữa Dielac Vinamilk Bình Thuận',
+    categoryName: 'Sữa tươi Vinamilk 180ml, Sữa bột Dielac & Sữa chua',
+    deliveryTime: '07:00 sáng',
+    contactName: 'Chị Lan (Điều phối Vinamilk)',
+    phone: '0252.381.4567',
     iconName: 'Milk',
   },
   gao_bun: {
     id: 'gao_bun',
-    name: 'Cơ sở Lương thực & Bún tươi Phương Nam',
-    categoryName: 'Gạo tẻ ST25 & Bún tươi sợi nhỏ',
+    name: 'Cửa hàng Bách hóa Tổng hợp Minh Phát (Gạo & Bún)',
+    categoryName: 'Gạo tẻ ST25 thơm Sóc Trăng & Bún tươi sợi nhỏ',
     deliveryTime: '06:00 sáng',
-    contactName: 'Anh Nam (Lò bún & Gạo)',
-    phone: '0918.999.888',
+    contactName: 'Anh Phát (Lò bún & Gạo ST25)',
+    phone: '0252.386.5432',
     iconName: 'Wheat',
   },
 };
 
 export function classifySupplier(item: ComputedMenuItem): SupplierType {
+  // Ưu tiên 0: Nhà cung cấp mặc định được chỉ định trong CSDL Thực phẩm
+  if (item.food.defaultSupplierId) {
+    return item.food.defaultSupplierId;
+  }
+
   const cat = item.food.category;
   const code = item.food.code.toUpperCase();
 

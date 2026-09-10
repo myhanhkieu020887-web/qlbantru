@@ -43,6 +43,9 @@ export interface FoodItem {
   vitaminCMg?: number;
   isFixed?: boolean;
   isWarehouseItem?: boolean; // Hàng kho khô (gạo, mắm muối dầu) vs Hàng chợ tươi
+  defaultSupplierId?: SupplierType; // Nhà cung cấp mặc định
+  contractPrice?: number; // Đơn giá ký hợp đồng
+  contractEffectiveDate?: string; // Ngày hiệu lực bảng giá
   allergens?: AllergenType[];
   inventoryStatus?: 'con_kho' | 'sap_het' | 'da_het' | 'di_cho';
 }
@@ -166,6 +169,7 @@ export interface DailyMenuPlan {
   schoolName: string;
   divisionName: string;
   ageGroup: AgeGroup;
+  branchId?: string; // 'all' | 'branch_1' | 'branch_2'
   studentCount: number;
   mealPricePerChild: number;
   serviceFee: number;
