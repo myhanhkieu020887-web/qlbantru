@@ -12,7 +12,7 @@ interface Props {
   onClose: () => void;
 }
 
-type PrintTemplateType = 'phieu_ke_cho' | 'so_khau_phan_01mn' | 'kiem_thuc_3_buoc';
+type PrintTemplateType = 'phieu_ke_cho' | 'so_khau_phan_01mn' | 'kiem_thuc_3_buoc' | 'phieu_xuat_kho_02vt';
 
 export const PrintPreviewModal: React.FC<Props> = ({
   plan,
@@ -66,6 +66,7 @@ export const PrintPreviewModal: React.FC<Props> = ({
               <option value="phieu_ke_cho">1. Phiếu kê chợ tiếp phẩm ngày (Tách tươi/kho)</option>
               <option value="so_khau_phan_01mn">2. Sổ theo dõi tính khẩu phần (Mẫu 01-MN)</option>
               <option value="kiem_thuc_3_buoc">3. Sổ kiểm thực 3 bước (QĐ 1246/QĐ-BYT)</option>
+              <option value="phieu_xuat_kho_02vt">4. Phiếu xuất kho thực phẩm (Mẫu 02-VT TT 107)</option>
             </select>
 
             <button
@@ -379,6 +380,113 @@ export const PrintPreviewModal: React.FC<Props> = ({
                     <p className="font-bold uppercase text-[11px]">Đại diện Ban Giám hiệu</p>
                     <p className="text-[10px] italic text-slate-500">(Ký, đóng dấu)</p>
                     <p className="font-bold text-xs mt-12">Nguyễn Thị Thắng</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MẪU 4: PHIẾU XUẤT KHO MẪU 02-VT (THÔNG TƯ 107/2017/TT-BTC) */}
+            {templateType === 'phieu_xuat_kho_02vt' && (
+              <div className="space-y-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-bold text-[11px] uppercase">{plan.schoolName}</p>
+                    <p className="text-[10px] text-slate-500">Bộ phận: Bếp ăn bán trú</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-xs">Mẫu số 02 - VT</p>
+                    <p className="text-[10px] italic text-slate-500 max-w-[220px]">
+                      (Ban hành theo TT số 107/2017/TT-BTC ngày 10/10/2017 của Bộ Tài chính)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-center my-3">
+                  <h2 className="text-base font-bold uppercase tracking-wider text-slate-900">
+                    PHIẾU XUẤT KHO THỰC PHẨM
+                  </h2>
+                  <p className="text-[11px] italic text-slate-600">
+                    Ngày {plan.date.split('-')[2]} tháng {plan.date.split('-')[1]} năm {plan.date.split('-')[0]}
+                  </p>
+                  <p className="text-xs font-mono font-semibold text-slate-700 mt-0.5">
+                    Số: PXK-{plan.date.replace(/-/g, '')}-{plan.ageGroup.toUpperCase()}
+                  </p>
+                </div>
+
+                <div className="space-y-1 text-xs text-slate-700">
+                  <p>
+                    - Họ và tên người nhận hàng: <span className="font-bold">Kiều Thị Mỹ Hạnh</span> • Bộ phận: <span className="font-bold">Tổ Bếp bán trú</span>
+                  </p>
+                  <p>
+                    - Lý do xuất kho: Xuất nguyên vật liệu kho khô chế biến bữa ăn học sinh ngày {plan.date} ({plan.studentCount} suất ăn)
+                  </p>
+                  <p>
+                    - Xuất tại kho: <span className="font-bold">Kho thực phẩm bán trú Trường MN Hàm Thắng 2</span>
+                  </p>
+                </div>
+
+                {/* Bảng nguyên liệu kho xuất */}
+                <div className="border border-slate-300 rounded overflow-hidden mt-3">
+                  <table className="w-full text-xs text-left border-collapse">
+                    <thead className="bg-slate-100 text-slate-800 font-bold text-[10px] uppercase">
+                      <tr>
+                        <th className="border border-slate-300 px-1.5 py-1 text-center w-8">STT</th>
+                        <th className="border border-slate-300 px-2 py-1">Tên, nhãn hiệu thực phẩm</th>
+                        <th className="border border-slate-300 px-2 py-1 text-center w-16">Mã số</th>
+                        <th className="border border-slate-300 px-2 py-1 text-center w-12">ĐVT</th>
+                        <th className="border border-slate-300 px-2 py-1 text-right w-20">Yêu cầu</th>
+                        <th className="border border-slate-300 px-2 py-1 text-right w-20">Thực xuất</th>
+                        <th className="border border-slate-300 px-2 py-1 text-right w-20">Đơn giá</th>
+                        <th className="border border-slate-300 px-2 py-1 text-right w-24">Thành tiền</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {warehouseItems.map((it, idx) => (
+                        <tr key={it.id}>
+                          <td className="border border-slate-300 px-1.5 py-1 text-center font-mono">{idx + 1}</td>
+                          <td className="border border-slate-300 px-2 py-1 font-medium">{it.food.name}</td>
+                          <td className="border border-slate-300 px-2 py-1 text-center font-mono text-[10px] text-slate-500">{it.food.code}</td>
+                          <td className="border border-slate-300 px-2 py-1 text-center">{it.food.unit}</td>
+                          <td className="border border-slate-300 px-2 py-1 text-right font-mono">{it.actualBuyKg.toFixed(2)}</td>
+                          <td className="border border-slate-300 px-2 py-1 text-right font-mono font-bold">{it.actualBuyKg.toFixed(2)}</td>
+                          <td className="border border-slate-300 px-2 py-1 text-right font-mono">{(it.food.contractPrice || it.food.price).toLocaleString('vi-VN')}</td>
+                          <td className="border border-slate-300 px-2 py-1 text-right font-mono font-bold">{Math.round(it.totalPrice).toLocaleString('vi-VN')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-slate-50 font-bold border-t-2 border-slate-300">
+                      <tr>
+                        <td colSpan={7} className="border border-slate-300 px-2 py-1 text-right uppercase text-[11px]">
+                          Tổng cộng tiền hàng xuất kho:
+                        </td>
+                        <td className="border border-slate-300 px-2 py-1 text-right font-mono font-extrabold text-blue-900">
+                          {Math.round(warehouseItems.reduce((s, it) => s + it.totalPrice, 0)).toLocaleString('vi-VN')} đ
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                <div className="grid grid-cols-4 gap-4 text-center mt-8 text-[11px]">
+                  <div>
+                    <p className="font-bold uppercase">Người lập phiếu</p>
+                    <p className="text-[10px] italic text-slate-500">(Ký, họ tên)</p>
+                    <p className="font-bold mt-12">Kiều Thị Mỹ Hạnh</p>
+                  </div>
+                  <div>
+                    <p className="font-bold uppercase">Người nhận hàng</p>
+                    <p className="text-[10px] italic text-slate-500">(Ký, họ tên)</p>
+                    <p className="font-bold mt-12">Tổ trưởng Nuôi dưỡng</p>
+                  </div>
+                  <div>
+                    <p className="font-bold uppercase">Thủ kho</p>
+                    <p className="text-[10px] italic text-slate-500">(Ký, họ tên)</p>
+                    <p className="font-bold mt-12">Thủ kho bán trú</p>
+                  </div>
+                  <div>
+                    <p className="font-bold uppercase">Thủ trưởng đơn vị</p>
+                    <p className="text-[10px] italic text-slate-500">(Ký, đóng dấu)</p>
+                    <p className="font-bold mt-12">Nguyễn Thị Thắng</p>
                   </div>
                 </div>
               </div>

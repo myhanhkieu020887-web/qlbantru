@@ -28,6 +28,7 @@ import {
   AlertCircle,
   Shield,
   UserCircle2,
+  Sliders,
 } from 'lucide-react';
 import { UserRole, ROLE_PERMISSIONS } from '@/types/auth';
 import { SyncStatus } from '@/lib/supabase/client';
@@ -49,7 +50,9 @@ export type PmsSubModule =
   | 'reports_forms'
   // 4. Tài chính & Cơ sở
   | 'finance'
+  | 'student_meal_ledger'
   | 'suppliers'
+  | 'nutrition_standards'
   | 'school_food';
 
 interface Props {
@@ -131,7 +134,9 @@ export const PmsAccordionSidebar: React.FC<Props> = ({
       groupTitle: '4. TÀI CHÍNH & CƠ SỞ',
       items: [
         { id: 'finance', label: 'Kế toán Tài chính', icon: ReceiptText, badge: 'C38/02-TT' },
+        { id: 'student_meal_ledger', label: 'Sổ tính tiền ăn (02-MN)', icon: FileSpreadsheet, badge: '9 Lớp' },
         { id: 'suppliers', label: 'Nhà cung cấp & Công nợ', icon: Building2, badge: '5 NCC' },
+        { id: 'nutrition_standards', label: 'Cấu hình định mức', icon: Sliders, badge: 'QĐ 2195' },
         { id: 'school_food', label: 'Thực phẩm trường', icon: Apple, badge: 'CSDL' },
       ],
     },

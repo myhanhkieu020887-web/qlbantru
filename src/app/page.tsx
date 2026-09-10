@@ -96,6 +96,14 @@ import {
   SEED_PAYMENT_VOUCHERS,
 } from '../data/seed-suppliers-debt';
 
+// Student Meal Ledger (Sổ tính tiền ăn 02-MN) & Nutrition Standards (Cấu hình định mức)
+import { StudentMealLedgerView } from '../components/views/StudentMealLedgerView';
+import { NutritionStandardsView } from '../components/views/NutritionStandardsView';
+import { ClassMealLedgerSummary } from '../types/student-meal-ledger';
+import { NutritionStandardConfig } from '../types/nutrition-standard';
+import { SEED_CLASS_MEAL_LEDGERS } from '../data/seed-student-meal-ledger';
+import { SEED_NUTRITION_STANDARDS } from '../data/seed-nutrition-standards';
+
 // Icons
 import { Sparkles, PlusCircle, FileSpreadsheet, Copy, Lock, Unlock, Printer } from 'lucide-react';
 
@@ -177,6 +185,12 @@ export default function PMSDashboardPage() {
   const [deliveryNotes, setDeliveryNotes] = useState<SupplierDeliveryNote[]>(SEED_DELIVERY_NOTES);
   const [monthlyReconciliations, setMonthlyReconciliations] = useState<SupplierMonthlyReconciliation[]>(SEED_MONTHLY_RECONCILIATIONS);
   const [paymentVouchers, setPaymentVouchers] = useState<SupplierPaymentVoucher[]>(SEED_PAYMENT_VOUCHERS);
+
+  // 14. Quản lý Sổ tính tiền ăn học sinh Mẫu 02-MN (9 lớp)
+  const [classMealLedgers, setClassMealLedgers] = useState<ClassMealLedgerSummary[]>(SEED_CLASS_MEAL_LEDGERS);
+
+  // 15. Quản lý Cấu hình Định mức dinh dưỡng & Tỷ lệ 3 bữa
+  const [nutritionStandards, setNutritionStandards] = useState<Record<string, NutritionStandardConfig>>(SEED_NUTRITION_STANDARDS);
 
   // 6. Modals & Toast
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -813,9 +827,15 @@ export default function PMSDashboardPage() {
     } else if (module === 'finance') {
       setActiveTab('finance');
       showToast('Đang chuyển đến: Kế toán Tài chính', 'info');
+    } else if (module === 'student_meal_ledger') {
+      setActiveTab('finance');
+      showToast('Đang chuyển đến: Sổ tính tiền ăn học sinh (Mẫu 02-MN)', 'info');
     } else if (module === 'suppliers') {
       setActiveTab('finance');
-      showToast('Đang chuyển đến danh mục: Nhà cung cấp & Công nợ', 'info');
+      showToast('Đang chuyển đến: Nhà cung cấp & Công nợ 3 bước', 'info');
+    } else if (module === 'nutrition_standards') {
+      setActiveTab('finance');
+      showToast('Đang chuyển đến: Cấu hình Định mức dinh dưỡng & Tỷ lệ 3 bữa', 'info');
     } else if (module === 'menu_templates') {
       setActiveTab('menu');
       showToast('Đang chuyển đến: Thư viện Thực đơn mẫu chuẩn QLMN (QĐ 2195)', 'info');
@@ -1200,9 +1220,27 @@ export default function PMSDashboardPage() {
           />
         )}
 
-        {/* VIEW 6: KẾ TOÁN TÀI CHÍNH HOẶC QUẢN LÝ NHÀ CUNG CẤP & CÔNG NỢ 3 BƯỚC */}
+        {/* VIEW 6: KẾ TOÁN TÀI CHÍNH / SỔ TÍNH TIỀN ĂN 02-MN / NCC / CẤU HÌNH ĐỊNH MỨC */}
         {activeTab === 'finance' && (
-          activePmsModule === 'suppliers' ? (
+          activePmsModule === 'student_meal_ledger' ? (
+            <StudentMealLedgerView
+              classSummaries={classMealLedgers}
+              onOpenPrintModal={() => setIsPrintModalOpen(true)}
+              onShowToast={showToast}
+            />
+          ) : activePmsModule === 'nutrition_standards' ? (
+            <NutritionStandardsView
+              standards={nutritionStandards}
+              onSaveStandard={(std) => {
+                setNutritionStandards((prev) => ({ ...prev, [std.ageGroup]: std }));
+                showToast(`✓ Đã lưu định mức & tỷ lệ 3 bữa cho ${std.title}`, 'success');
+              }}
+              onResetStandard={(ag) => {
+                setNutritionStandards((prev) => ({ ...prev, [ag]: SEED_NUTRITION_STANDARDS[ag] }));
+              }}
+              onShowToast={showToast}
+            />
+          ) : activePmsModule === 'suppliers' ? (
             <SupplierListView
               contracts={supplierContracts}
               deliveryNotes={deliveryNotes}
