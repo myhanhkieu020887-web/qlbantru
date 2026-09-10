@@ -17,6 +17,7 @@ import {
   GitBranch,
   ArrowLeft,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { BranchSwitcher } from '../navigation/BranchSwitcher';
 
@@ -32,6 +33,7 @@ interface Props {
   canLockMenu?: boolean;
   studentCount: number;
   onStudentCountChange: (count: number) => void;
+  onFetchAttendanceCount?: () => void;
   selectedBranchId?: string;
   onBranchSelect?: (branchId: string) => void;
   branchInput?: string;
@@ -65,6 +67,7 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
   canLockMenu = true,
   studentCount,
   onStudentCountChange,
+  onFetchAttendanceCount,
   selectedBranchId = 'all',
   onBranchSelect,
   branchInput,
@@ -262,6 +265,21 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
             <span className="font-mono font-bold text-emerald-800 bg-emerald-100/70 px-1.5 py-0.2 rounded border border-emerald-300 text-[10.5px]">
               {studentCount} trẻ
             </span>
+
+            {/* Nút lấy sĩ số có mặt thực tế từ 9 lớp học */}
+            {onFetchAttendanceCount && (
+              <button
+                type="button"
+                onClick={onFetchAttendanceCount}
+                disabled={isLocked}
+                className="flex items-center gap-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-2 py-0.5 rounded text-[10.5px] font-bold shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+                title="Lấy sĩ số học sinh có mặt thực tế từ Sổ điểm danh 9 lớp"
+              >
+                <RefreshCw className="w-3 h-3 text-purple-600" />
+                <span>Lấy sĩ số điểm danh</span>
+              </button>
+            )}
+
             {branches.length > 1 && (
               <span className="text-[10px] text-slate-500 hidden xl:inline font-mono">
                 ({branches.map(b => `${b.code}: ${b.studentCount}`).join(', ')})

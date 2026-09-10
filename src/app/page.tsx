@@ -22,6 +22,7 @@ import { formatNumber, formatCurrency } from '../lib/utils';
 import { UserRole, ROLE_PERMISSIONS } from '../types/auth';
 import { SyncStatus, checkSupabaseConnection } from '../lib/supabase/client';
 import { saveDailyMenuToSupabase, saveAttendanceToSupabase } from '../lib/supabase/repository';
+import { STANDARD_FOOD_CATALOG } from '../data/standard-foods';
 
 import { AppTab } from '../components/navigation/TopNavBar';
 import { LeftSidebarPanel } from '../components/layout/LeftSidebarPanel';
@@ -605,6 +606,197 @@ export default function PMSDashboardPage() {
     showToast(`✓ Đã thêm ${food.name} vào thực đơn`, 'success');
   };
 
+  // 12. Thêm món ăn dinh dưỡng & tự động bung danh sách nguyên liệu BOM
+  const handleAddDishToMenu = (dish: DishItem, session: MealSession) => {
+    if (currentPlan.status === 'LOCKED') {
+      showToast('Thực đơn đã khóa sổ, không thể chỉnh sửa!', 'error');
+      return;
+    }
+
+    const updatedItems = [...currentPlan.items];
+    let addedIngCount = 0;
+    let mergedIngCount = 0;
+
+    dish.ingredients.forEach((ing) => {
+      // Tìm FoodItem trong STANDARD_FOOD_CATALOG
+      const foodMatch =
+        STANDARD_FOOD_CATALOG.find(
+          (f) =>
+            f.id === ing.foodId ||
+            f.code.toLowerCase() === ing.foodCode.toLowerCase() ||
+            f.name.toLowerCase() === ing.foodName.toLowerCase()
+        ) ||
+        // Fallback tạo FoodItem nếu chưa có trong catalog
+        ({
+          id: ing.foodId || `food_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          code: ing.foodCode || 'FOOD_AUTO',
+          name: ing.foodName,
+          category: (ing.category as any) || 'khac',
+          unit: ing.unit || 'kg',
+          price: ing.unitPrice || 0,
+          gamExchange: 1000,
+          wasteFactor: 0,
+          isAnimalProtein: ing.proteinPerChild > 0,
+          isAnimalFat: ing.fatPerChild > 0,
+          isFreeSugar: false,
+          sodiumMg: 0,
+          protein100g: ing.gamPerChild > 0 ? (ing.proteinPerChild / ing.gamPerChild) * 100 : 0,
+          fat100g: ing.gamPerChild > 0 ? (ing.fatPerChild / ing.gamPerChild) * 100 : 0,
+          carbs100g: ing.gamPerChild > 0 ? (ing.carbsPerChild / ing.gamPerChild) * 100 : 0,
+          calciumMg: 0,
+          ironMg: 0,
+          vitaminB1Mg: 0,
+          vitaminCMg: 0,
+        } as FoodItem);
+
+      // Kiểm tra xem trong session này đã có nguyên liệu đó chưa (gộp gia vị, dầu mỡ, nước mắm, hành tiêu...)
+      const existingIndex = updatedItems.findIndex(
+        (it) =>
+          it.mealSession === session &&
+          (it.food.id === foodMatch.id ||
+            it.food.code.toLowerCase() === foodMatch.code.toLowerCase() ||
+            it.food.name.toLowerCase() === foodMatch.name.toLowerCase())
+      );
+
+      if (existingIndex >= 0) {
+        // Gộp định lượng vào dòng đã có
+        const exist = updatedItems[existingIndex];
+        updatedItems[existingIndex] = {
+          ...exist,
+          gamPerChild: Number((exist.gamPerChild + ing.gamPerChild).toFixed(2)),
+          dishName: exist.dishName ? `${exist.dishName}, ${dish.name}` : dish.name,
+        };
+        mergedIngCount++;
+      } else {
+        // Thêm nguyên liệu mới
+        const newItem: MenuItem = {
+          id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          foodId: foodMatch.id,
+          food: foodMatch,
+          mealSession: session,
+          gamPerChild: ing.gamPerChild,
+          dishId: dish.id,
+          dishName: dish.name,
+          isFixed: false,
+        };
+        updatedItems.push(newItem);
+        addedIngCount++;
+      }
+    });
+
+    // Cập nhật tên thực đơn nếu chưa có
+    let newMenuTitle = currentPlan.menuTitle;
+    const sessionKey = session === 'chinh_trua' ? 'trua' : session === 'phu_xe' ? 'xe' : 'phu_xe';
+    const currentTitles = currentPlan.menuTitle[sessionKey] ? currentPlan.menuTitle[sessionKey].split(', ') : [];
+    if (!currentTitles.includes(dish.name)) {
+      newMenuTitle = {
+        ...newMenuTitle,
+        [sessionKey]: currentTitles.length > 0 ? `${currentPlan.menuTitle[sessionKey]}, ${dish.name}` : dish.name,
+      };
+    }
+
+    updateCurrentPlan((prev) => ({
+      ...prev,
+      items: updatedItems,
+      menuTitle: newMenuTitle,
+      status: 'DRAFT',
+    }));
+
+    showToast(
+      `✓ Đã thêm món "${dish.name}" (Bung ${addedIngCount} NL mới, gộp ${mergedIngCount} gia vị/nguyên liệu chung)`,
+      'success'
+    );
+  };
+
+  // 13. Xóa toàn bộ nguyên liệu thuộc món ăn khỏi bữa
+  const handleRemoveDishFromMenu = (dishName: string, session: MealSession) => {
+    if (currentPlan.status === 'LOCKED') {
+      showToast('Thực đơn đã khóa sổ, không thể xóa món!', 'error');
+      return;
+    }
+
+    const beforeCount = currentPlan.items.length;
+    const filteredItems = currentPlan.items.filter(
+      (it) =>
+        !(
+          it.mealSession === session &&
+          (it.dishName === dishName ||
+            it.food.name.toLowerCase() === dishName.toLowerCase() ||
+            (it.dishName && it.dishName.includes(dishName)))
+        )
+    );
+
+    const removedCount = beforeCount - filteredItems.length;
+
+    // Cập nhật menuTitle
+    const sessionKey = session === 'chinh_trua' ? 'trua' : session === 'phu_xe' ? 'xe' : 'phu_xe';
+    const oldTitle = currentPlan.menuTitle[sessionKey] || '';
+    const newTitleStr = oldTitle
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s && s.toLowerCase() !== dishName.toLowerCase())
+      .join(', ');
+
+    updateCurrentPlan((prev) => ({
+      ...prev,
+      items: filteredItems,
+      menuTitle: {
+        ...prev.menuTitle,
+        [sessionKey]: newTitleStr,
+      },
+      status: 'DRAFT',
+    }));
+
+    showToast(`✓ Đã xóa món "${dishName}" (giảm ${removedCount} dòng nguyên liệu)`, 'info');
+  };
+
+  // 14. Đồng bộ sĩ số ăn thực tế từ module Điểm danh
+  const handleFetchAttendanceCount = () => {
+    if (currentPlan.status === 'LOCKED') {
+      showToast('Thực đơn đã khóa sổ, không thể sửa sĩ số!', 'error');
+      return;
+    }
+
+    let actualSum = 0;
+    if (currentSegment === 'maugiao') {
+      if (selectedBranchId === 'branch_1') {
+        // Điểm 1: Các lớp Mầm, Chồi, Lá chính trường
+        actualSum = attendanceData
+          .filter((c) => c.ageGroup === 'maugiao' && c.id !== 'class_mg_ghep')
+          .reduce((sum, c) => sum + c.actualCount, 0);
+      } else if (selectedBranchId === 'branch_2') {
+        // Điểm 2: Lớp Ghép Điểm 2
+        actualSum = attendanceData
+          .filter((c) => c.id === 'class_mg_ghep')
+          .reduce((sum, c) => sum + c.actualCount, 0);
+      } else {
+        // Toàn trường mẫu giáo (426 cháu)
+        actualSum = attendanceData
+          .filter((c) => c.ageGroup === 'maugiao')
+          .reduce((sum, c) => sum + c.actualCount, 0);
+      }
+    } else if (currentSegment === 'nhatre') {
+      // Khối nhà trẻ (100 cháu)
+      actualSum = attendanceData
+        .filter((c) => c.ageGroup === 'nhatre')
+        .reduce((sum, c) => sum + c.actualCount, 0);
+    } else {
+      // Phân hệ ăn sáng
+      actualSum = attendanceData.reduce((sum, c) => sum + (c.breakfastCount || 0), 0);
+    }
+
+    if (actualSum > 0) {
+      updateCurrentPlan((prev) => ({
+        ...prev,
+        studentCount: actualSum,
+        status: 'DRAFT',
+      }));
+      showToast(`✓ Đã lấy sĩ số điểm danh thực tế: ${actualSum} cháu`, 'success');
+    } else {
+      showToast('Không tìm thấy dữ liệu điểm danh phù hợp!', 'error');
+    }
+  };
+
   // Xuất file Excel chuẩn Thanh tra
   const handleExportExcel = async () => {
     try {
@@ -1058,28 +1250,31 @@ export default function PMSDashboardPage() {
             <>
               {/* Cột Trái: Lịch tuần, Phân hệ, Cây món ăn, KPI Dinh dưỡng (Hỗ trợ thu gọn/mở rộng) */}
               <LeftSidebarPanel
-              schedule={schedule}
-              selectedDate={selectedDate}
-              onSelectDate={(d) => setSelectedDate(d)}
-              currentSegment={currentSegment}
-              onSegmentChange={(seg) => setCurrentSegment(seg)}
-              studentCount={currentPlan.studentCount}
-              onStudentCountChange={(count) =>
-                updateCurrentPlan((p) => ({ ...p, studentCount: count }))
-              }
-              mealPrice={currentPlan.mealPricePerChild}
-              onMealPriceChange={(price) =>
-                updateCurrentPlan((p) => ({ ...p, mealPricePerChild: price }))
-              }
-              canEditPrice={rolePerm.canEditPrice && !isLocked}
-              totals={totals}
-              onOpenTemplateModal={() => setIsTemplateModalOpen(true)}
-              onCloneCurrentDay={handleCloneCurrentDay}
-              onOpenAuditDrawer={() => setIsAuditDrawerOpen(true)}
-              onOpenAuto20DaysModal={() => setIsAuto20DaysModalOpen(true)}
-              isCollapsed={isSidebarCollapsed}
-              onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            />
+                schedule={schedule}
+                selectedDate={selectedDate}
+                onSelectDate={(d) => setSelectedDate(d)}
+                currentSegment={currentSegment}
+                onSegmentChange={(seg) => setCurrentSegment(seg)}
+                studentCount={currentPlan.studentCount}
+                onStudentCountChange={(count) =>
+                  updateCurrentPlan((p) => ({ ...p, studentCount: count }))
+                }
+                mealPrice={currentPlan.mealPricePerChild}
+                onMealPriceChange={(price) =>
+                  updateCurrentPlan((p) => ({ ...p, mealPricePerChild: price }))
+                }
+                canEditPrice={rolePerm.canEditPrice && !isLocked}
+                totals={totals}
+                onOpenTemplateModal={() => setIsTemplateModalOpen(true)}
+                onCloneCurrentDay={handleCloneCurrentDay}
+                onOpenAuditDrawer={() => setIsAuditDrawerOpen(true)}
+                onOpenAuto20DaysModal={() => setIsAuto20DaysModalOpen(true)}
+                dishCatalog={dishItems}
+                onAddDishToMenu={handleAddDishToMenu}
+                onRemoveDishFromMenu={handleRemoveDishFromMenu}
+                isCollapsed={isSidebarCollapsed}
+                onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              />
 
             {/* Cột Phải: Dải điều khiển tài chính hợp nhất + Lưới Kế toán 13 Cột Toàn Màn Hình */}
             <main className="flex-1 flex flex-col overflow-hidden bg-white">
@@ -1101,6 +1296,7 @@ export default function PMSDashboardPage() {
                 onStudentCountChange={(cnt) =>
                   updateCurrentPlan((p) => ({ ...p, studentCount: cnt }))
                 }
+                onFetchAttendanceCount={handleFetchAttendanceCount}
                 selectedBranchId={selectedBranchId}
                 onBranchSelect={handleBranchSelect}
                 branchInput={branchInput}
