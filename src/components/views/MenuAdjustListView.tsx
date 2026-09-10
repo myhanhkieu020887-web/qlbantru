@@ -20,6 +20,7 @@ import {
   Square,
   X,
   FileSpreadsheet,
+  Sparkles,
 } from 'lucide-react';
 
 interface Props {
@@ -27,6 +28,7 @@ interface Props {
   onEditRecord: (record: MenuAdjustRecord) => void;
   onAddRecord?: (newRecord: Partial<MenuAdjustRecord>) => void;
   onDeleteRecords?: (ids: string[]) => void;
+  onOpenAuto20DaysModal?: () => void;
 }
 
 export const MenuAdjustListView: React.FC<Props> = ({
@@ -34,6 +36,7 @@ export const MenuAdjustListView: React.FC<Props> = ({
   onEditRecord,
   onAddRecord,
   onDeleteRecords,
+  onOpenAuto20DaysModal,
 }) => {
   const [records, setRecords] = useState<MenuAdjustRecord[]>(initialRecords);
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -175,6 +178,18 @@ export const MenuAdjustListView: React.FC<Props> = ({
             <PlusCircle className="w-4 h-4" />
             <span>Cân đối thực đơn ngày</span>
           </button>
+
+          {onOpenAuto20DaysModal && (
+            <button
+              type="button"
+              onClick={onOpenAuto20DaysModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white rounded text-xs font-bold shadow-xs transition-all hover:scale-102"
+              title="Tự động sinh chu kỳ thực đơn 4 tuần (20 ngày) không lặp món chính theo QĐ 2195"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+              <span>Sinh 4 tuần (QĐ 2195)</span>
+            </button>
+          )}
 
           <button
             type="button"

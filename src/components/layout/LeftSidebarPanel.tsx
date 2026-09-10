@@ -35,6 +35,7 @@ interface Props {
   onOpenTemplateModal: () => void;
   onCloneCurrentDay: () => void;
   onOpenAuditDrawer?: () => void;
+  onOpenAuto20DaysModal?: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
 }
@@ -54,6 +55,7 @@ export const LeftSidebarPanel: React.FC<Props> = ({
   onOpenTemplateModal,
   onCloneCurrentDay,
   onOpenAuditDrawer,
+  onOpenAuto20DaysModal,
   isCollapsed = false,
   onToggleCollapse,
 }) => {
@@ -138,6 +140,17 @@ export const LeftSidebarPanel: React.FC<Props> = ({
             >
               Copy
             </button>
+            {onOpenAuto20DaysModal && (
+              <button
+                type="button"
+                onClick={onOpenAuto20DaysModal}
+                className="px-1.5 py-0.2 rounded bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-bold text-[9px] hover:from-teal-600 hover:to-emerald-700 shadow-2xs flex items-center gap-0.5 transition-all"
+                title="Tự động sinh thực đơn 4 tuần chuẩn QĐ 2195"
+              >
+                <Sparkles className="w-2.5 h-2.5 text-amber-200 animate-pulse" />
+                <span>4 Tuần</span>
+              </button>
+            )}
             {onToggleCollapse && (
               <button
                 type="button"

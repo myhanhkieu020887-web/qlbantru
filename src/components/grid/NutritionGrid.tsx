@@ -17,6 +17,11 @@ import {
   CheckSquare,
   Square,
   ArrowUpDown,
+  BookmarkPlus,
+  Scale,
+  Plus,
+  Minus,
+  Sparkles,
 } from 'lucide-react';
 
 interface Props {
@@ -30,6 +35,8 @@ interface Props {
   onUpdatePrice?: (itemId: string, newPrice: number) => void;
   onToggleFixed: (itemId: string) => void;
   onRemoveItem: (itemId: string) => void;
+  onScaleNutrientGroup?: (category: 'protein' | 'carbs' | 'fat' | 'veg', percent: number) => void;
+  onSaveAsTemplate?: () => void;
 }
 
 const SESSION_LABELS: Record<MealSession, { label: string; color: string }> = {
@@ -59,6 +66,8 @@ export const NutritionGrid: React.FC<Props> = ({
   onUpdatePrice,
   onToggleFixed,
   onRemoveItem,
+  onScaleNutrientGroup,
+  onSaveAsTemplate,
 }) => {
   const [groupByDish, setGroupByDish] = useState<boolean>(true);
   const [showColSettings, setShowColSettings] = useState<boolean>(false);
@@ -213,15 +222,133 @@ export const NutritionGrid: React.FC<Props> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-[10px] text-slate-500 font-mono">
-          {branches.length > 1 && (
-            <span className="text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
-              Phân bổ: {branches.map(b => `${b.code}: ${b.studentCount} trẻ`).join(' | ')}
-            </span>
+        <div className="flex items-center gap-2">
+          {onSaveAsTemplate && (
+            <button
+              type="button"
+              onClick={onSaveAsTemplate}
+              className="flex items-center gap-1 px-2.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-2xs transition-colors"
+              title="Lưu toàn bộ cấu hình món và định lượng ngày hôm nay vào Thư viện Thực đơn mẫu của trường"
+            >
+              <BookmarkPlus className="w-3.5 h-3.5" />
+              <span>Lưu làm Thực đơn mẫu</span>
+            </button>
           )}
-          <span>Tổng số: <strong>{items.length}</strong> thực phẩm</span>
+
+          <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono">
+            {branches.length > 1 && (
+              <span className="text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
+                Phân bổ: {branches.map(b => `${b.code}: ${b.studentCount} trẻ`).join(' | ')}
+              </span>
+            )}
+            <span>Tổng số: <strong>{items.length}</strong> thực phẩm</span>
+          </div>
         </div>
       </div>
+
+      {/* THANH CÔNG CỤ CO GIÃN ĐỊNH LƯỢNG NHANH (SCALING FACTOR) CHUẨN ĐIỀU HÀNH BẾP */}
+      {onScaleNutrientGroup && !isLocked && (
+        <div className="bg-amber-50/80 border-b border-amber-200 px-3 py-1 flex flex-wrap items-center justify-between gap-2 text-[11px] text-amber-900 shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="font-bold flex items-center gap-1 text-amber-950">
+              <Scale className="w-3.5 h-3.5 text-amber-700" />
+              <span>Co giãn định lượng nhanh:</span>
+            </span>
+
+            {/* Cụm Đạm */}
+            <div className="flex items-center gap-1 bg-white/80 px-2 py-0.5 rounded border border-amber-200">
+              <span className="font-semibold text-rose-700 text-[10.5px]">Đạm (Thịt/Cá):</span>
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('protein', -2)}
+                className="px-1 py-0.2 rounded bg-rose-100 hover:bg-rose-200 text-rose-800 font-mono text-[10px] font-bold"
+                title="Giảm 2% định lượng đạm"
+              >
+                -2%
+              </button>
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('protein', 2)}
+                className="px-1 py-0.2 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-mono text-[10px] font-bold"
+                title="Tăng 2% định lượng đạm"
+              >
+                +2%
+              </button>
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('protein', 5)}
+                className="px-1 py-0.2 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-mono text-[10px] font-bold"
+                title="Tăng 5% định lượng đạm"
+              >
+                +5%
+              </button>
+            </div>
+
+            {/* Cụm Tinh bột */}
+            <div className="flex items-center gap-1 bg-white/80 px-2 py-0.5 rounded border border-amber-200">
+              <span className="font-semibold text-amber-800 text-[10.5px]">Tinh bột (Gạo):</span>
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('carbs', -3)}
+                className="px-1 py-0.2 rounded bg-rose-100 hover:bg-rose-200 text-rose-800 font-mono text-[10px] font-bold"
+                title="Giảm 3% định lượng gạo"
+              >
+                -3%
+              </button>
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('carbs', 3)}
+                className="px-1 py-0.2 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-mono text-[10px] font-bold"
+                title="Tăng 3% định lượng gạo"
+              >
+                +3%
+              </button>
+            </div>
+
+            {/* Cụm Rau củ */}
+            <div className="flex items-center gap-1 bg-white/80 px-2 py-0.5 rounded border border-amber-200">
+              <span className="font-semibold text-emerald-800 text-[10.5px]">Rau củ:</span>
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('veg', -5)}
+                className="px-1 py-0.2 rounded bg-rose-100 hover:bg-rose-200 text-rose-800 font-mono text-[10px] font-bold"
+              >
+                -5%
+              </button>
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('veg', 5)}
+                className="px-1 py-0.2 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-mono text-[10px] font-bold"
+              >
+                +5%
+              </button>
+            </div>
+
+            {/* Cụm Dầu mỡ */}
+            <div className="flex items-center gap-1 bg-white/80 px-2 py-0.5 rounded border border-amber-200">
+              <span className="font-semibold text-orange-800 text-[10.5px]">Dầu mỡ:</span>
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('fat', -5)}
+                className="px-1 py-0.2 rounded bg-rose-100 hover:bg-rose-200 text-rose-800 font-mono text-[10px] font-bold"
+              >
+                -5%
+              </button>
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('fat', 5)}
+                className="px-1 py-0.2 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-mono text-[10px] font-bold"
+              >
+                +5%
+              </button>
+            </div>
+          </div>
+
+          <span className="text-[10px] text-amber-800/80 italic">
+            * Nhấn để tinh chỉnh nhanh khẩu phần khi thừa/thiếu Kcal nhẹ
+          </span>
+        </div>
+      )}
 
       {/* BẢNG DỮ LIỆU CHÍNH (CÓ CỤM CỘT ĐIỂM TRƯỜNG & SỐ NGUYÊN) */}
       <div className="flex-1 overflow-auto">
@@ -421,7 +548,14 @@ export const NutritionGrid: React.FC<Props> = ({
                           )}
 
                           <td className="py-0.5 px-1.5 text-right border-r border-slate-200 font-mono font-bold text-slate-800 text-[11px]">
-                            {formatNumber(it.actualBuyKg, 3)}
+                            <div className="flex flex-col items-end">
+                              <span>{formatNumber(it.actualBuyKg, 3)}</span>
+                              {it.inventoryDeductedKg !== undefined && it.inventoryDeductedKg > 0 && (
+                                <span className="text-[9px] text-emerald-700 bg-emerald-50 px-1 rounded border border-emerald-200 font-normal">
+                                  -kho: {formatNumber(it.inventoryDeductedKg, 2)}
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           {/* CỘT THỰC MUA SỐ NGUYÊN TỪNG ĐIỂM TRƯỜNG */}

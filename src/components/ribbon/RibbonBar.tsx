@@ -54,6 +54,7 @@ interface Props {
   onOpenSmartPO?: () => void;
   onOpenFoodSafety?: () => void;
   isDistributionUnlocked?: boolean;
+  onOpenAuto20DaysModal?: () => void;
 }
 
 export const RibbonBar: React.FC<Props> = ({
@@ -80,6 +81,7 @@ export const RibbonBar: React.FC<Props> = ({
   onOpenSmartPO,
   onOpenFoodSafety,
   isDistributionUnlocked = false,
+  onOpenAuto20DaysModal,
 }) => {
   const [activeTab, setActiveTab] = useState<'home' | 'solver' | 'logistics' | 'reports' | 'view'>('home');
 
@@ -304,6 +306,17 @@ export const RibbonBar: React.FC<Props> = ({
                     <span>Khôi phục</span>
                     <span className="text-[9px] font-normal text-gray-400">Mẫu gốc</span>
                   </button>
+                  {onOpenAuto20DaysModal && (
+                    <button
+                      onClick={onOpenAuto20DaysModal}
+                      className="flex flex-col items-center justify-center px-3 py-1.5 rounded-md bg-gradient-to-b from-teal-50 to-emerald-100 border border-teal-400 hover:border-teal-500 text-teal-900 text-xs font-bold gap-1 shadow-sm transition-all hover:scale-102"
+                      title="Tự động sinh chu kỳ 4 tuần (20 ngày) không lặp món chính theo QĐ 2195"
+                    >
+                      <Sparkles className="w-5 h-5 text-teal-700 animate-pulse" />
+                      <span>SINH 4 TUẦN</span>
+                      <span className="text-[9px] font-bold text-emerald-700 uppercase">QĐ 2195</span>
+                    </button>
+                  )}
                 </div>
                 <div className="text-[10px] text-gray-500 uppercase tracking-wider text-center mt-1">
                   Công cụ Tối ưu
@@ -391,6 +404,15 @@ export const RibbonBar: React.FC<Props> = ({
                   <CheckCircle className="w-3.5 h-3.5" /> Đạm động vật ≥ 50%
                 </span>
               </div>
+              {onOpenAuto20DaysModal && (
+                <button
+                  onClick={onOpenAuto20DaysModal}
+                  className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-md bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold text-xs shadow transition-all active:scale-95"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                  <span>Trình Thuật Sĩ Sinh 4 Tuần (QĐ 2195)</span>
+                </button>
+              )}
             </div>
           )}
 

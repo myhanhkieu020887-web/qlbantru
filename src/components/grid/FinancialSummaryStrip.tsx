@@ -16,6 +16,7 @@ import {
   Lock,
   GitBranch,
   ArrowLeft,
+  Sparkles,
 } from 'lucide-react';
 
 interface Props {
@@ -44,6 +45,7 @@ interface Props {
   onSave?: () => void;
   onPrint?: () => void;
   onSaveTemplate?: () => void;
+  onOpenAuto20DaysModal?: () => void;
   isLocked?: boolean;
   canEditNutrients?: boolean;
 }
@@ -74,6 +76,7 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
   onSave,
   onPrint,
   onSaveTemplate,
+  onOpenAuto20DaysModal,
   isLocked = false,
   canEditNutrients = true,
 }) => {
@@ -197,6 +200,18 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
             >
               <BookmarkPlus className="w-3 h-3" />
               <span>Mẫu</span>
+            </button>
+          )}
+
+          {onOpenAuto20DaysModal && (
+            <button
+              type="button"
+              onClick={onOpenAuto20DaysModal}
+              className="flex items-center gap-1 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white px-2.5 py-0.5 rounded text-[11px] font-bold shadow-xs transition-all hover:scale-102"
+              title="Tự động sinh chu kỳ 4 tuần (20 ngày) chuẩn QĐ 2195"
+            >
+              <Sparkles className="w-3 h-3 text-amber-200 animate-pulse" />
+              <span>Sinh 4 Tuần</span>
             </button>
           )}
         </div>

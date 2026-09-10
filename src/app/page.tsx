@@ -53,6 +53,8 @@ import {
 import { AddFoodModal } from '../components/dialogs/AddFoodModal';
 import { ApplyTemplateModal } from '../components/dialogs/ApplyTemplateModal';
 import { NutritionalAuditDrawer } from '../components/dialogs/NutritionalAuditDrawer';
+import { AutoMenu20DaysWizardModal } from '../components/dialogs/AutoMenu20DaysWizardModal';
+import { Month20DaysCycleResult } from '../engine/menu-cycle-generator';
 import { SolverResult } from '../engine/milp-solver';
 
 // PMS 10-Module Accordion & Storage Import List View (Chuan qlmn.vn)
@@ -70,6 +72,14 @@ import { MenuAdjustRecord } from '../types/menu-adjust';
 import { DishListView } from '../components/views/DishListView';
 import { SEED_DISH_ITEMS } from '../data/seed-dishes';
 import { DishItem } from '../types/dish';
+
+// Menu Planning View (Chuan qlmn.vn/single/dinhduong/menu_planning/list)
+import { MenuPlanningView } from '../components/views/MenuPlanningView';
+import { SEED_MENU_TEMPLATES } from '../data/seed-menu-templates';
+import { MenuTemplateItem } from '../types/menu-template';
+
+// Print Preview Modal (A4 Print Preview)
+import { PrintPreviewModal } from '../components/dialogs/PrintPreviewModal';
 
 // Icons
 import { Sparkles, PlusCircle, FileSpreadsheet, Copy, Lock, Unlock, Printer } from 'lucide-react';
@@ -142,14 +152,75 @@ export default function PMSDashboardPage() {
   // 11. Quản lý Danh mục Món ăn dinh dưỡng (Chuẩn qlmn.vn/dish/list)
   const [dishItems, setDishItems] = useState<DishItem[]>(SEED_DISH_ITEMS);
 
+  // 12. Quản lý Thư viện Thực đơn mẫu (Chuẩn qlmn.vn/menu_planning/list)
+  const [menuTemplates, setMenuTemplates] = useState<MenuTemplateItem[]>(SEED_MENU_TEMPLATES);
+
   // 6. Modals & Toast
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState<boolean>(false);
+  const [isAuto20DaysModalOpen, setIsAuto20DaysModalOpen] = useState<boolean>(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
+  };
+
+  // Áp dụng chu kỳ 20 ngày: Đồng bộ kép vào Lịch tuần 5 ngày & Sổ cân đối tháng
+  const handleApplyCycleToSchedule = (cycleResult: Month20DaysCycleResult, targetWeek: number) => {
+    // 1. Lọc 5 ngày của tuần được chọn (weekIndex === targetWeek)
+    const weekDays = cycleResult.days.filter((d) => d.weekIndex === targetWeek);
+
+    // 2. Cập nhật vào Lịch tuần 5 ngày (schedule)
+    setSchedule((prevSchedule) =>
+      prevSchedule.map((bundle, index) => {
+        const cycleDay = weekDays[index];
+        if (!cycleDay) return bundle;
+
+        const basePlan = (bundle[currentSegment] as DailyMenuPlan | undefined) || bundle.maugiao;
+        const updatedPlan: DailyMenuPlan = {
+          ...basePlan,
+          menuCode: cycleDay.mainDishName,
+          status: 'OPTIMIZED',
+          items: cycleDay.items,
+          mealPricePerChild: cycleDay.costPerChild,
+        };
+
+        return {
+          ...bundle,
+          [currentSegment]: updatedPlan,
+        };
+      })
+    );
+
+    // 3. Đồng bộ toàn bộ 20 ngày vào Sổ cân đối tháng (menuAdjustRecords)
+    const newMonthRecords: MenuAdjustRecord[] = cycleResult.days.map((d) => {
+      const parts = d.dateString.split('-');
+      const displayDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      const groupName = cycleResult.ageGroup === 'maugiao' ? 'Mẫu giáo' : 'Nhà trẻ';
+
+      return {
+        id: `cdkp_${d.dateString.replace(/-/g, '_')}`,
+        stt: d.dayIndex,
+        date: displayDate,
+        rawDate: d.dateString,
+        targetGroups: [groupName],
+        targetGroupsDisplay: groupName,
+        menuNamesDisplay: `SÁNG: ${d.breakfastDish}; TRƯA: ${d.lunchMainDish} + ${d.lunchSoupDish}; PHỤ: ${d.dessertDish} / ${d.afternoonSnackDish}; CHIỀU: ${d.afternoonMilkDish}`,
+        studentCount: cycleResult.studentCount,
+        mealPricesDisplay: `${d.costPerChild.toLocaleString('vi-VN')} đ`,
+        createdAt: new Date().toLocaleString('vi-VN'),
+        updatedAt: new Date().toLocaleString('vi-VN'),
+        status: 'OPTIMIZED',
+      };
+    });
+
+    setMenuAdjustRecords(newMonthRecords);
+    showToast(
+      `✓ ĐÃ ÁP DỤNG ĐỒNG BỘ KÉP: Nạp Tuần ${targetWeek} vào Lịch 5 ngày & 20 ngày vào Sổ cân đối tháng!`,
+      'success'
+    );
   };
 
   // Kiểm tra kết nối Supabase khi khởi chạy
@@ -173,6 +244,8 @@ export default function PMSDashboardPage() {
       ? currentBundle.maugiao
       : currentSegment === 'nhatre'
       ? currentBundle.nhatre
+      : currentSegment === 'cbgvnv'
+      ? (currentBundle.cbgvnv || currentBundle.maugiao)
       : currentBundle.ansang;
 
   // Tính toán dinh dưỡng thời gian thực
@@ -721,14 +794,72 @@ export default function PMSDashboardPage() {
       setActiveTab('finance');
       showToast('Đang chuyển đến danh mục: Nhà cung cấp & Công nợ', 'info');
     } else if (module === 'menu_templates') {
-      setIsTemplateModalOpen(true);
+      setActiveTab('menu');
+      showToast('Đang chuyển đến: Thư viện Thực đơn mẫu chuẩn QLMN (QĐ 2195)', 'info');
     } else if (module === 'reports_forms') {
-      setIsAuditDrawerOpen(true);
+      setIsPrintModalOpen(true);
     } else if (module === 'school_food') {
       setIsAddModalOpen(true);
     } else {
       showToast(`Đã chọn phân hệ: ${module}`, 'info');
     }
+  };
+
+  // Co giãn định lượng nhanh theo nhóm thực phẩm (Scaling Factor)
+  const handleScaleNutrientGroup = (category: 'protein' | 'carbs' | 'fat' | 'veg', percent: number) => {
+    const factor = 1 + percent / 100;
+    updateCurrentPlan((plan) => ({
+      ...plan,
+      items: plan.items.map((it) => {
+        const cat = it.food.category;
+        const isMatch =
+          (category === 'protein' && (cat === 'thit_ca' || it.food.isAnimalProtein)) ||
+          (category === 'carbs' && cat === 'gao') ||
+          (category === 'fat' && (cat === 'dau_mo' || it.food.isAnimalFat)) ||
+          (category === 'veg' && cat === 'rau_cu');
+        if (isMatch) {
+          return {
+            ...it,
+            gamPerChild: Math.max(0.5, Math.round(it.gamPerChild * factor * 10) / 10),
+          };
+        }
+        return it;
+      }),
+    }));
+    showToast(`✓ Đã điều chỉnh ${percent > 0 ? '+' : ''}${percent}% định lượng nhóm ${category}`, 'success');
+  };
+
+  // Lưu ngày hiện tại vào Thư viện Thực đơn mẫu
+  const handleSaveCurrentAsTemplate = () => {
+    const code = `TD_${currentSegment.toUpperCase()}_${Date.now().toString().slice(-4)}`;
+    const newTpl: MenuTemplateItem = {
+      id: `tpl_${Date.now()}`,
+      code,
+      name: `Mẫu lưu ngày ${selectedDate} (${currentSegment === 'maugiao' ? 'Mẫu giáo' : currentSegment === 'nhatre' ? 'Nhà trẻ' : 'Ăn sáng'})`,
+      ageGroup: currentSegment,
+      mealPrice: currentPlan.mealPricePerChild,
+      dishes: currentPlan.items.map((it) => ({
+        dishId: it.dishId || it.id,
+        dishName: it.dishName || it.food.name,
+        mealSession: it.mealSession,
+        category: it.food.category,
+      })),
+      calo: Math.round(totals.totalCalo * 10) / 10,
+      proteinPct: Math.round(totals.proteinPct * 10) / 10,
+      fatPct: Math.round(totals.fatPct * 10) / 10,
+      carbsPct: Math.round(totals.carbsPct * 10) / 10,
+      animalProteinRatio: Math.round(totals.animalProteinRatio),
+      plantFatRatio: Math.round(totals.plantFatRatio),
+      sodiumMg: Math.round(totals.totalSodiumMg),
+      costPerChild: Math.round(totals.costPerChild),
+      isQuantityPass: totals.isCaloPass,
+      isQualityPass: totals.isRatioPass,
+      createdAt: new Date().toLocaleString('vi-VN'),
+      updatedAt: new Date().toLocaleString('vi-VN'),
+      note: `Lưu tự động từ Lưới kế toán ngày ${selectedDate}`,
+    };
+    setMenuTemplates([newTpl, ...menuTemplates]);
+    showToast(`✓ Đã lưu thành Thực đơn mẫu: ${code}`, 'success');
   };
 
   // 10. Handlers cho Sổ CĐKP tháng
@@ -833,6 +964,27 @@ export default function PMSDashboardPage() {
                 }}
               />
             </div>
+          ) : activePmsModule === 'menu_templates' ? (
+            <div className="flex-1 flex overflow-hidden bg-slate-100">
+              <MenuPlanningView
+                templates={menuTemplates}
+                onApplyTemplateToDate={(tpl, targetDate) => {
+                  setSelectedDate(targetDate);
+                  setCurrentSegment(tpl.ageGroup);
+                  setActivePmsModule('nutrition_grid');
+                  setMenuViewMode('detail');
+                  showToast(`✓ Đã áp dụng mẫu "${tpl.name}" vào ngày ${targetDate}`, 'success');
+                }}
+                onDeleteTemplates={(ids) => {
+                  setMenuTemplates((prev) => prev.filter((t) => !ids.includes(t.id)));
+                  showToast('✓ Đã xóa thực đơn mẫu', 'info');
+                }}
+                onAddTemplate={(newTpl) => {
+                  setMenuTemplates([newTpl, ...menuTemplates]);
+                  showToast(`✓ Đã tạo mẫu mới: ${newTpl.name}`, 'success');
+                }}
+              />
+            </div>
           ) : (activePmsModule === 'nutrition_adjust_month' || menuViewMode === 'list') ? (
             <div className="flex-1 flex overflow-hidden bg-slate-100">
               <MenuAdjustListView
@@ -840,6 +992,7 @@ export default function PMSDashboardPage() {
                 onEditRecord={handleEditMenuAdjustRecord}
                 onAddRecord={handleAddMenuAdjustRecord}
                 onDeleteRecords={handleDeleteMenuAdjustRecords}
+                onOpenAuto20DaysModal={() => setIsAuto20DaysModalOpen(true)}
               />
             </div>
           ) : (
@@ -864,6 +1017,7 @@ export default function PMSDashboardPage() {
               onOpenTemplateModal={() => setIsTemplateModalOpen(true)}
               onCloneCurrentDay={handleCloneCurrentDay}
               onOpenAuditDrawer={() => setIsAuditDrawerOpen(true)}
+              onOpenAuto20DaysModal={() => setIsAuto20DaysModalOpen(true)}
               isCollapsed={isSidebarCollapsed}
               onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             />
@@ -905,8 +1059,9 @@ export default function PMSDashboardPage() {
                   triggerCloudSync();
                   showToast('Đã lưu dữ liệu thực đơn thành công', 'success');
                 }}
-                onPrint={() => window.print()}
-                onSaveTemplate={() => showToast('Đã lưu thành thực đơn mẫu chuẩn', 'success')}
+                onPrint={() => setIsPrintModalOpen(true)}
+                onSaveTemplate={handleSaveCurrentAsTemplate}
+                onOpenAuto20DaysModal={() => setIsAuto20DaysModalOpen(true)}
                 isLocked={isLocked}
                 canEditNutrients={rolePerm.canEditNutrients}
               />
@@ -942,6 +1097,8 @@ export default function PMSDashboardPage() {
                 onUpdateBranchBuy={handleUpdateBranchBuy}
                 onToggleFixed={handleToggleFixed}
                 onRemoveItem={handleRemoveItem}
+                onScaleNutrientGroup={handleScaleNutrientGroup}
+                onSaveAsTemplate={handleSaveCurrentAsTemplate}
               />
 
               {/* Chân trang Ma trận Dinh dưỡng 7 dòng + Phân bổ Calo từng bữa + Thẻ Đánh giá Lượng/Chất + Nút cam Cân đối thực đơn */}
@@ -1025,6 +1182,16 @@ export default function PMSDashboardPage() {
         onApplyTemplate={handleApplyTemplate}
       />
 
+      {/* TRÌNH THUẬT SĨ TỰ ĐỘNG SINH THỰC ĐƠN 4 TUẦN (QĐ 2195) */}
+      <AutoMenu20DaysWizardModal
+        isOpen={isAuto20DaysModalOpen}
+        onClose={() => setIsAuto20DaysModalOpen(false)}
+        onApplyToSchedule={handleApplyCycleToSchedule}
+        initialAgeGroup={currentSegment}
+        initialStudentCount={currentPlan.studentCount}
+        initialBudget={currentPlan.mealPricePerChild}
+      />
+
       {/* NGĂN THẨM ĐỊNH LƯỢNG & CHẤT (DÀNH CHO PHÓ HIỆU TRƯỞNG BÁN TRÚ) */}
       <NutritionalAuditDrawer
         isOpen={isAuditDrawerOpen}
@@ -1036,6 +1203,14 @@ export default function PMSDashboardPage() {
         onApproveMenu={() => handleStatusChange('APPROVED')}
         solverResult={solverResult}
         isSolving={isSolving}
+      />
+
+      {/* MODAL IN ẤN A4 CHUẨN CÔNG VĂN (PHIẾU KÊ CHỢ, SỔ 01-MN, KIỂM THỰC 3 BƯỚC) */}
+      <PrintPreviewModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        plan={currentPlan}
+        totals={totals}
       />
 
       {/* Toast Notification */}

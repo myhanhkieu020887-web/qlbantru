@@ -55,7 +55,7 @@ export function solveNutritionMenu(
     const cat = it.food.category;
     if (cat === 'gia_vi') return true;
     const unit = it.food.unit.toLowerCase();
-    if (unit === 'quả' || unit === 'hộp' || unit === 'gói') return true;
+    if (unit === 'quả' || unit === 'hộp' || unit === 'gói' || unit === 'cái') return true;
     return false;
   };
 
@@ -142,13 +142,13 @@ export function solveNutritionMenu(
       const cost1g = (food.price / (food.gamExchange || 1000)) * buyFactor;
 
       const grad =
-        costErr * cost1g * 2.0 +
-        caloErr * (calo1g / 20) * 1.5 +
+        costErr * cost1g * 1.2 +
+        caloErr * (calo1g / 15) * 3.0 +
         pErr * (p1g * 4) * 1.0 +
-        lErr * (l1g * 9) * 1.0 +
+        lErr * (l1g * 9) * 1.2 +
         gErr * (g1g * 4) * 0.8;
 
-      x[v] -= learningRate * grad * 15;
+      x[v] -= learningRate * grad * 18;
       x[v] = Math.max(minGams[v], Math.min(maxGams[v], x[v]));
     }
   }
@@ -158,21 +158,42 @@ export function solveNutritionMenu(
     optimizedItems[itemIdx].gamPerChild = Math.round(x[vIdx] * 10) / 10;
   });
 
-  // 4. Pha 2: Khóa Cứng Ngân Sách Bằng Vi Chỉnh Tinh Bột Nền (Budget Hard-Lock)
+  // 4. Pha 2: Khóa Cứng Ngân Sách Thông Minh (Cân bằng tiền ăn chính xác đến từng đồng)
   const midTotals = computeNutritionTotals(optimizedItems, studentCount, targetBudget, ageGroup).totals;
-  const residual = targetBudget - midTotals.costPerChild;
+  let residual = targetBudget - midTotals.costPerChild;
 
-  // Tìm nguyên liệu tinh bột chính (gạo hoặc nui) để hấp thụ phần sai số ngân sách
-  const grainItem = optimizedItems.find((it) => it.food.category === 'gao' && it.gamPerChild >= 20);
-  if (grainItem) {
+  // 4.1 Vi chỉnh món đạm động vật chính (thịt / cá / tôm) trước vì đạm chiếm tỷ trọng tiền cao nhất
+  const proteinItem = optimizedItems.find(
+    (it) => it.food.category === 'thit_ca' && !isItemFixed(it) && it.gamPerChild >= 15
+  );
+  if (proteinItem) {
+    const food = proteinItem.food;
+    const waste = food.wasteFactor || 0;
+    const buyFactor = waste < 100 ? 1 / (1 - waste / 100) : 1;
+    const cost1g = (food.price / (food.gamExchange || 1000)) * buyFactor;
+
+    if (cost1g > 0) {
+      const deltaProteinG = residual / cost1g;
+      const newProteinG = Math.max(12, Math.min(50, proteinItem.gamPerChild + deltaProteinG));
+      const actualDeltaG = newProteinG - proteinItem.gamPerChild;
+      proteinItem.gamPerChild = Math.round(newProteinG * 10) / 10;
+      residual -= actualDeltaG * cost1g;
+    }
+  }
+
+  // 4.2 Vi chỉnh tinh bột gạo nền để bù nốt phần sai số còn lại (|chi - thu| <= 10đ)
+  const grainItem = optimizedItems.find((it) => it.food.category === 'gao' && !isItemFixed(it) && it.gamPerChild >= 20);
+  if (grainItem && Math.abs(residual) > 5) {
     const food = grainItem.food;
     const waste = food.wasteFactor || 0;
     const buyFactor = waste < 100 ? 1 / (1 - waste / 100) : 1;
     const cost1g = (food.price / (food.gamExchange || 1000)) * buyFactor;
 
     if (cost1g > 0) {
-      const deltaG = residual / cost1g;
-      grainItem.gamPerChild = Math.round((grainItem.gamPerChild + deltaG) * 10) / 10;
+      const minG = Math.max(15, grainItem.gamPerChild - 15);
+      const maxG = grainItem.gamPerChild + 15;
+      const targetGrainG = Math.max(minG, Math.min(maxG, grainItem.gamPerChild + residual / cost1g));
+      grainItem.gamPerChild = Math.round(targetGrainG * 10) / 10;
     }
   }
 

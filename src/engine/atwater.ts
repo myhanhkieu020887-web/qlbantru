@@ -16,13 +16,22 @@ export function computeMenuItem(
   // Khối lượng thực ăn cho cả trường (kg)
   const actualEatKg = (gamPerChild * studentCount) / 1000;
 
-  // Khối lượng thực mua tính theo hệ số thải bỏ (kg)
-  // Thực mua = Thực ăn / (1 - %thải bỏ / 100)
-  let actualBuyKg = waste < 100 ? actualEatKg / (1 - waste / 100) : actualEatKg;
+  // Khối lượng tổng nhu cầu thô tính theo hệ số thải bỏ (kg)
+  const grossNeedKg = waste < 100 ? actualEatKg / (1 - waste / 100) : actualEatKg;
+
+  // Tự động nhận diện thực phẩm kho khô nếu chưa gán
+  if (food.isWarehouseItem === undefined) {
+    food.isWarehouseItem = food.category === 'gao' || food.category === 'gia_vi' || food.category === 'dau_mo';
+  }
+
+  // Trừ tồn kho khả dụng (nếu có) để tính lượng thực tế đi chợ mua mới
+  const availableInv = item.availableInventoryKg || 0;
+  const inventoryDeductedKg = Math.min(grossNeedKg, availableInv);
+  let actualBuyKg = Math.max(0, grossNeedKg - inventoryDeductedKg);
 
   // Làm tròn theo bước nhảy thương mại nếu có cấu hình stepSize
   const step = food.stepSize || 0;
-  if (step > 0) {
+  if (step > 0 && actualBuyKg > 0) {
     const unitLower = food.unit.toLowerCase();
     if (unitLower === 'quả' || unitLower === 'hộp') {
       const unitsRaw = (actualBuyKg * 1000) / (food.gamExchange || 1000);
@@ -88,6 +97,7 @@ export function computeMenuItem(
     ...item,
     actualEatKg,
     actualBuyKg,
+    inventoryDeductedKg,
     actualBuyUnit,
     branchBuyUnits,
     unitPrice: food.price,

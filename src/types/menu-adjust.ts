@@ -10,6 +10,6 @@ export interface MenuAdjustRecord {
   mealPricesDisplay: string;  // "21000; 7000" hoặc "21000; 21000; 7000"
   createdAt: string;          // "31/08/2026, 15:05:33"
   updatedAt: string;          // "07/09/2026, 20:56:17"
-  status?: 'DRAFT' | 'APPROVED' | 'LOCKED';
+  status?: 'DRAFT' | 'OPTIMIZED' | 'APPROVED' | 'LOCKED';
   notes?: string;
 }

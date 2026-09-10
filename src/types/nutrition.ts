@@ -42,11 +42,12 @@ export interface FoodItem {
   vitaminB1Mg?: number;
   vitaminCMg?: number;
   isFixed?: boolean;
+  isWarehouseItem?: boolean; // Hàng kho khô (gạo, mắm muối dầu) vs Hàng chợ tươi
   allergens?: AllergenType[];
   inventoryStatus?: 'con_kho' | 'sap_het' | 'da_het' | 'di_cho';
 }
 
-export type AgeGroup = 'maugiao' | 'nhatre' | 'ansang';
+export type AgeGroup = 'maugiao' | 'nhatre' | 'ansang' | 'cbgvnv';
 
 export type MealSession = 'sang' | 'chinh_trua' | 'phu_trua' | 'xe' | 'phu_xe';
 
@@ -69,6 +70,7 @@ export interface MenuItem {
   dishName?: string;
   note?: string;
   isFixed?: boolean;
+  availableInventoryKg?: number; // Tồn kho khả dụng trừ khi đi chợ
   branchQuantities?: Record<string, number>;
   customTotalBuy?: number;
 }
@@ -87,6 +89,7 @@ export interface MealCaloEvaluation {
 export interface ComputedMenuItem extends MenuItem {
   actualEatKg: number;
   actualBuyKg: number;
+  inventoryDeductedKg?: number; // Số lượng đã trừ từ kho dự trữ
   actualBuyUnit: number;
   branchBuyUnits?: Record<string, number>;
   unitPrice: number;
@@ -203,6 +206,7 @@ export interface DayMenuBundle {
   maugiao: DailyMenuPlan;
   nhatre: DailyMenuPlan;
   ansang: DailyMenuPlan;
+  cbgvnv?: DailyMenuPlan;
 }
 
 // Module 1: Tuần thực đơn
