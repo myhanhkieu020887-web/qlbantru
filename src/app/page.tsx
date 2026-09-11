@@ -119,6 +119,7 @@ export default function PMSDashboardPage() {
   // 2. Quản lý Lịch tuần 5 ngày
   const [schedule, setSchedule] = useState<DayMenuBundle[]>(SEED_WEEKLY_SCHEDULE);
   const [selectedDate, setSelectedDate] = useState<string>('2026-09-09');
+  const [isFillingMonth, setIsFillingMonth] = useState<boolean>(false);
 
   // 3. Quản lý 3 Phân hệ: Mẫu giáo | Nhà trẻ | Ăn sáng
   const [currentSegment, setCurrentSegment] = useState<AgeGroup>('maugiao');
@@ -955,6 +956,38 @@ export default function PMSDashboardPage() {
     showToast(`✓ Đã sao chép toàn bộ thực đơn ngày ${selectedDate} sang ${targetDate}`, 'success');
   };
 
+  // Module 1: Tự động fill chu kỳ 4 tuần xoay vòng cho cả tháng lên Cloud
+  const handleFillMonth = async () => {
+    setIsFillingMonth(true);
+    try {
+      const cur = new Date(selectedDate);
+      const res = await fetch('/api/menus/fill-month', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          month: cur.getMonth() + 1,
+          year: cur.getFullYear(),
+          segment: currentSegment,
+          studentCount: currentPlan.studentCount,
+          budgetPerStudent: currentPlan.mealPricePerChild,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(
+          `✓ Đã fill thành công ${data.filled}/${data.total} ngày thực đơn tháng ${cur.getMonth() + 1} (Bỏ qua ${data.skipped} ngày đã khóa)`,
+          'success'
+        );
+      } else {
+        showToast(`Cảnh báo: ${data.error || 'Có lỗi khi fill tháng'}`, 'info');
+      }
+    } catch {
+      showToast('Lỗi kết nối khi fill thực đơn tháng', 'error');
+    } finally {
+      setIsFillingMonth(false);
+    }
+  };
+
   // Module 1: Áp dụng thực đơn mẫu
   const handleApplyTemplate = (scope: 'day' | 'week') => {
     showToast(`✓ Đã áp dụng Thực đơn Mẫu chuẩn QĐ 2195 cho ${scope === 'week' ? 'cả tuần' : 'ngày ' + selectedDate}`, 'success');
@@ -1299,6 +1332,8 @@ export default function PMSDashboardPage() {
                 onRemoveDishFromMenu={handleRemoveDishFromMenu}
                 isCollapsed={isSidebarCollapsed}
                 onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                onFillMonth={handleFillMonth}
+                isFillingMonth={isFillingMonth}
               />
 
             {/* Cột Phải: Dải điều khiển tài chính hợp nhất + Lưới Kế toán 13 Cột Toàn Màn Hình */}

@@ -48,6 +48,8 @@ interface Props {
   onRemoveDishFromMenu?: (dishName: string, session: MealSession) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  onFillMonth?: () => void;
+  isFillingMonth?: boolean;
 }
 
 export const LeftSidebarPanel: React.FC<Props> = ({
@@ -71,6 +73,8 @@ export const LeftSidebarPanel: React.FC<Props> = ({
   onRemoveDishFromMenu,
   isCollapsed = false,
   onToggleCollapse,
+  onFillMonth,
+  isFillingMonth = false,
 }) => {
   const [isDishPickerOpen, setIsDishPickerOpen] = useState<boolean>(false);
   const [activePickerSession, setActivePickerSession] = useState<MealSession>('chinh_trua');
@@ -218,6 +222,18 @@ export const LeftSidebarPanel: React.FC<Props> = ({
               >
                 <Sparkles className="w-2.5 h-2.5 text-amber-200 animate-pulse" />
                 <span>4 Tuần</span>
+              </button>
+            )}
+            {onFillMonth && (
+              <button
+                type="button"
+                onClick={onFillMonth}
+                disabled={isFillingMonth}
+                className="px-1.5 py-0.2 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-[9px] shadow-2xs flex items-center gap-0.5 transition-all disabled:opacity-50 cursor-pointer"
+                title="Tự động Fill cả tháng theo chu kỳ 4 tuần lên Cloud"
+              >
+                <Calendar className="w-2.5 h-2.5 text-blue-200" />
+                <span>{isFillingMonth ? '...' : 'Fill'}</span>
               </button>
             )}
             {onToggleCollapse && (

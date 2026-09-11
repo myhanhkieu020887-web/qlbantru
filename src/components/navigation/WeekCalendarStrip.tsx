@@ -11,6 +11,8 @@ interface Props {
   currentSegment: AgeGroup;
   onOpenTemplateModal: () => void;
   onCloneCurrentDay: () => void;
+  onFillMonth?: () => void;
+  isFillingMonth?: boolean;
 }
 
 const STATUS_BADGE: Record<MenuStatus, { label: string; color: string; icon: React.ReactNode }> = {
@@ -43,6 +45,8 @@ export const WeekCalendarStrip: React.FC<Props> = ({
   currentSegment,
   onOpenTemplateModal,
   onCloneCurrentDay,
+  onFillMonth,
+  isFillingMonth = false,
 }) => {
   return (
     <div className="bg-[#f0f3f8] border-b border-gray-300 px-3 py-1.5 flex items-center justify-between gap-3 text-xs select-none">
@@ -108,10 +112,21 @@ export const WeekCalendarStrip: React.FC<Props> = ({
 
       {/* 3. Tác vụ nhanh lịch tuần */}
       <div className="flex items-center gap-1.5 pl-3 border-l border-gray-300">
+        {onFillMonth && (
+          <button
+            onClick={onFillMonth}
+            disabled={isFillingMonth}
+            title="Tự động gán thực đơn 4 tuần xoay vòng cho cả tháng"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-700 font-semibold text-xs shadow-sm active:scale-95 disabled:opacity-50 cursor-pointer"
+          >
+            <Calendar className="w-3.5 h-3.5 text-blue-600" />
+            <span>{isFillingMonth ? 'Đang fill...' : 'Fill tháng'}</span>
+          </button>
+        )}
         <button
           onClick={onOpenTemplateModal}
           title="Áp dụng thực đơn mẫu tuần theo QĐ 2195"
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-semibold text-xs shadow-sm active:scale-95"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-semibold text-xs shadow-sm active:scale-95 cursor-pointer"
         >
           <Sparkles className="w-3.5 h-3.5 text-amber-600" />
           <span>Thực đơn mẫu</span>
@@ -119,7 +134,7 @@ export const WeekCalendarStrip: React.FC<Props> = ({
         <button
           onClick={onCloneCurrentDay}
           title="Sao chép thực đơn ngày này sang ngày khác"
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-semibold text-xs shadow-sm active:scale-95"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-semibold text-xs shadow-sm active:scale-95 cursor-pointer"
         >
           <Copy className="w-3.5 h-3.5 text-blue-600" />
           <span>Sao chép ngày</span>

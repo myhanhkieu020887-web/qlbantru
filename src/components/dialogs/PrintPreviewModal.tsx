@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { DailyMenuPlan, NutritionTotals } from '../../types/nutrition';
 import { computeNutritionTotals } from '../../engine/atwater';
-import { Printer, X, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Printer, X, FileText, CheckCircle2, AlertCircle, Download, Loader2 } from 'lucide-react';
 
 interface Props {
   plan: DailyMenuPlan;
@@ -39,8 +39,35 @@ export const PrintPreviewModal: React.FC<Props> = ({
     (it) => it.food.isWarehouseItem || it.food.category === 'gao' || it.food.category === 'gia_vi' || it.food.category === 'dau_mo'
   );
 
+  const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
+
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleExportServerPdf = async () => {
+    setIsExportingPdf(true);
+    try {
+      const res = await fetch('/api/reports/menu-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan, totals: finalTotals }),
+      });
+      if (!res.ok) throw new Error('Không thể tạo file PDF');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Thuc_don_${plan.date}_${plan.ageGroup}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Có lỗi khi tải file PDF: ' + (err instanceof Error ? err.message : ''));
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   return (
@@ -71,8 +98,19 @@ export const PrintPreviewModal: React.FC<Props> = ({
 
             <button
               type="button"
+              onClick={handleExportServerPdf}
+              disabled={isExportingPdf}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded text-xs font-bold shadow-md transition-all cursor-pointer"
+              title="Xuất file PDF A4 chuẩn server-side"
+            >
+              {isExportingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              <span>{isExportingPdf ? 'Đang tạo PDF...' : 'Tải PDF A4'}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold shadow-md transition-all hover:scale-102"
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold shadow-md transition-all hover:scale-102 cursor-pointer"
             >
               <Printer className="w-4 h-4" />
               <span>In ngay (Ctrl+P)</span>
