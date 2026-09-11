@@ -49,6 +49,8 @@ interface Props {
   onPrint?: () => void;
   onSaveTemplate?: () => void;
   onOpenAuto20DaysModal?: () => void;
+  onOpenAiSuggest?: () => void;
+  onOpenSolverConfig?: () => void;
   isLocked?: boolean;
   canEditNutrients?: boolean;
 }
@@ -83,6 +85,8 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
   onPrint,
   onSaveTemplate,
   onOpenAuto20DaysModal,
+  onOpenAiSuggest,
+  onOpenSolverConfig,
   isLocked = false,
   canEditNutrients = true,
 }) => {
@@ -225,6 +229,30 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
               >
                 <Sparkles className="w-3 h-3 text-amber-500" />
                 <span className="hidden md:inline">Sinh 4T</span>
+              </button>
+            )}
+
+            {onOpenAiSuggest && (
+              <button
+                type="button"
+                onClick={onOpenAiSuggest}
+                className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-purple-700 hover:text-purple-900 hover:bg-white rounded transition cursor-pointer"
+                title="Gợi ý thực đơn thông minh bằng AI Gemini"
+              >
+                <Sparkles className="w-3 h-3 text-purple-600 animate-pulse" />
+                <span className="hidden md:inline">Gợi ý AI</span>
+              </button>
+            )}
+
+            {onOpenSolverConfig && (
+              <button
+                type="button"
+                onClick={onOpenSolverConfig}
+                className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:text-blue-700 hover:bg-white rounded transition cursor-pointer"
+                title="Cấu hình trọng số và biên độ thuật toán Solver MILP"
+              >
+                <SlidersHorizontal className="w-3 h-3 text-blue-600" />
+                <span className="hidden md:inline">Solver</span>
               </button>
             )}
           </div>

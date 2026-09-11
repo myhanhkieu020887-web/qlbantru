@@ -80,6 +80,10 @@ import { MenuTemplateItem } from '../types/menu-template';
 
 // Print Preview Modal (A4 Print Preview)
 import { PrintPreviewModal } from '../components/dialogs/PrintPreviewModal';
+import { SolverConfigModal } from '../components/dialogs/SolverConfigModal';
+import { AiMenuSuggestModal } from '../components/dialogs/AiMenuSuggestModal';
+import { SolverOptions } from '../engine/milp-solver';
+import { AiMenuSuggestionResult } from '../lib/services/AiMenuService';
 
 // Supplier & Invoices (Quy trình công nợ 3 bước & Multi-campus)
 import { SupplierListView } from '../components/views/SupplierListView';
@@ -198,6 +202,15 @@ export default function PMSDashboardPage() {
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState<boolean>(false);
   const [isAuto20DaysModalOpen, setIsAuto20DaysModalOpen] = useState<boolean>(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
+  const [isSolverConfigOpen, setIsSolverConfigOpen] = useState<boolean>(false);
+  const [isAiSuggestOpen, setIsAiSuggestOpen] = useState<boolean>(false);
+  const [solverConfig, setSolverConfig] = useState<SolverOptions>({
+    costWeight: 1.2,
+    caloWeight: 3.0,
+    macroWeight: 1.0,
+    minScaleFactor: 0.5,
+    maxScaleFactor: 1.6,
+  });
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -340,19 +353,23 @@ export default function PMSDashboardPage() {
     [selectedDate, currentSegment]
   );
 
-  // 1. Chạy Bộ giải tối ưu MILP 2 pha
-  const handleRunSolver = useCallback(() => {
+  // 1. Chạy Bộ giải tối ưu MILP 2 pha (Hỗ trợ cấu hình trọng số)
+  const handleRunSolver = useCallback((customOptions?: SolverOptions) => {
     if (currentPlan.status === 'LOCKED') {
       showToast('Thực đơn đã khóa sổ! Không thể cân đối lại.', 'error');
       return;
     }
 
     setIsSolving(true);
+    const optionsToUse = customOptions || solverConfig;
     const res = solveNutritionMenu(
       currentPlan.items,
       currentPlan.studentCount,
       currentPlan.ageGroup,
-      { targetBudgetPerChild: currentPlan.mealPricePerChild }
+      {
+        targetBudgetPerChild: currentPlan.mealPricePerChild,
+        ...optionsToUse,
+      }
     );
     setIsSolving(false);
     setSolverResult(res);
@@ -373,7 +390,26 @@ export default function PMSDashboardPage() {
     } else {
       showToast(res.message, 'error');
     }
-  }, [currentPlan, updateCurrentPlan, triggerCloudSync]);
+  }, [currentPlan, updateCurrentPlan, triggerCloudSync, solverConfig]);
+
+  // Áp dụng gợi ý từ AI Gemini vào thực đơn hiện tại
+  const handleApplyAiSuggestion = (suggestion: AiMenuSuggestionResult) => {
+    updateCurrentPlan((prev) => {
+      const updatedMenuTitle = { ...prev.menuTitle };
+      suggestion.suggestedDishes.forEach((d) => {
+        if (d.mealSession === 'chinh_trua') updatedMenuTitle.trua = d.dishName;
+        if (d.mealSession === 'phu_trua') updatedMenuTitle.phu_trua = d.dishName;
+        if (d.mealSession === 'xe') updatedMenuTitle.xe = d.dishName;
+        if (d.mealSession === 'phu_xe') updatedMenuTitle.phu_xe = d.dishName;
+      });
+      return {
+        ...prev,
+        menuCode: suggestion.title,
+        menuTitle: updatedMenuTitle,
+      };
+    });
+    showToast(`✨ Đã áp dụng gợi ý AI: ${suggestion.title}`, 'success');
+  };
 
   // Phím tắt bàn phím Desktop F9, Ctrl+E, Ctrl+P
   useEffect(() => {
@@ -1377,6 +1413,8 @@ export default function PMSDashboardPage() {
                 onPrint={() => setIsPrintModalOpen(true)}
                 onSaveTemplate={handleSaveCurrentAsTemplate}
                 onOpenAuto20DaysModal={() => setIsAuto20DaysModalOpen(true)}
+                onOpenAiSuggest={() => setIsAiSuggestOpen(true)}
+                onOpenSolverConfig={() => setIsSolverConfigOpen(true)}
                 isLocked={isLocked}
                 canEditNutrients={rolePerm.canEditNutrients}
               />
@@ -1555,6 +1593,27 @@ export default function PMSDashboardPage() {
         onClose={() => setIsPrintModalOpen(false)}
         plan={currentPlan}
         totals={totals}
+      />
+
+      {/* MODAL CẤU HÌNH TRỌNG SỐ VÀ BIÊN ĐỘ SOLVER MILP */}
+      <SolverConfigModal
+        isOpen={isSolverConfigOpen}
+        onClose={() => setIsSolverConfigOpen(false)}
+        config={solverConfig}
+        onSaveConfig={(newCfg) => setSolverConfig(newCfg)}
+        onRunSolverWithConfig={(customCfg) => handleRunSolver(customCfg)}
+      />
+
+      {/* MODAL TRỢ LÝ AI GỢI Ý THỰC ĐƠN BÁN TRÚ */}
+      <AiMenuSuggestModal
+        isOpen={isAiSuggestOpen}
+        onClose={() => setIsAiSuggestOpen(false)}
+        ageGroup={currentSegment}
+        date={selectedDate}
+        studentCount={currentPlan.studentCount}
+        budgetPerStudent={currentPlan.mealPricePerChild}
+        recentDishes={schedule.map((b) => b.maugiao.menuCode).filter(Boolean)}
+        onApplySuggestion={handleApplyAiSuggestion}
       />
 
       {/* Toast Notification */}

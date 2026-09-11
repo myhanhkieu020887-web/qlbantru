@@ -7,6 +7,13 @@ export interface SolverOptions {
   targetProteinPct?: number;
   targetFatPct?: number;
   targetCarbsPct?: number;
+
+  // Cấu hình nâng cao (Weights & Elastic Bounds)
+  costWeight?: number;      // Trọng số ưu tiên giảm chi phí (0.2 - 2.5, default: 1.2)
+  caloWeight?: number;      // Trọng số ưu tiên Calo (1.0 - 5.0, default: 3.0)
+  macroWeight?: number;     // Trọng số cân bằng P-L-C (0.5 - 2.0, default: 1.0)
+  minScaleFactor?: number;  // Giới hạn giảm tối thiểu (0.3 - 0.8, default: 0.5)
+  maxScaleFactor?: number;  // Giới hạn tăng tối đa (1.2 - 2.2, default: 1.6)
 }
 
 export interface SolverResult {
@@ -86,14 +93,21 @@ export function solveNutritionMenu(
     };
   }
 
+  // Trọng số và biên độ điều chỉnh
+  const costW = options.costWeight ?? 1.2;
+  const caloW = options.caloWeight ?? 3.0;
+  const macroW = options.macroWeight ?? 1.0;
+  const minScale = options.minScaleFactor ?? 0.5;
+  const maxScale = options.maxScaleFactor ?? 1.6;
+
   // Khởi tạo giới hạn sinh học chuẩn QĐ 2195
   const minGams = variableIndices.map((idx) => {
     const val = optimizedItems[idx].gamPerChild;
-    return Math.max(1.0, val * 0.5);
+    return Math.max(1.0, val * minScale);
   });
   const maxGams = variableIndices.map((idx) => {
     const val = optimizedItems[idx].gamPerChild;
-    return val * 1.6;
+    return val * maxScale;
   });
 
   let x = variableIndices.map((idx) => optimizedItems[idx].gamPerChild);
@@ -142,11 +156,9 @@ export function solveNutritionMenu(
       const cost1g = (food.price / (food.gamExchange || 1000)) * buyFactor;
 
       const grad =
-        costErr * cost1g * 1.2 +
-        caloErr * (calo1g / 15) * 3.0 +
-        pErr * (p1g * 4) * 1.0 +
-        lErr * (l1g * 9) * 1.2 +
-        gErr * (g1g * 4) * 0.8;
+        costErr * cost1g * costW +
+        caloErr * (calo1g / 15) * caloW +
+        (pErr * (p1g * 4) * 1.0 + lErr * (l1g * 9) * 1.2 + gErr * (g1g * 4) * 0.8) * macroW;
 
       x[v] -= learningRate * grad * 18;
       x[v] = Math.max(minGams[v], Math.min(maxGams[v], x[v]));
