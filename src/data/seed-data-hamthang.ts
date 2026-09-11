@@ -457,7 +457,7 @@ export const SEED_MENU_PLAN_HAMTHANG: DailyMenuPlan = {
   schoolName: 'Trường Mẫu Giáo Hàm Thắng',
   divisionName: 'UBND PHƯỜNG HÀM THẮNG',
   ageGroup: 'maugiao',
-  studentCount: 526,
+  studentCount: 1210,
   mealPricePerChild: 21000,
   serviceFee: 0,
   menuCode: 'TRƯA. 09/9/2026',

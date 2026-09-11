@@ -431,16 +431,36 @@ export default function PMSDashboardPage() {
     });
   };
 
-  // Thay đổi chuỗi điểm trường (VD: "282;116")
+  // Thay đổi chuỗi điểm trường (VD: "850;360")
   const handleBranchInputChange = (newVal: string) => {
     setBranchInput(newVal);
     const parts = newVal
       .split(';')
       .map((s) => parseInt(s.trim(), 10))
-      .filter((n) => !isNaN(n) && n > 0);
+      .filter((n) => !isNaN(n) && n >= 0);
     if (parts.length > 0) {
-      const sum = parts.reduce((a, b) => a + b, 0);
-      updateCurrentPlan((p) => ({ ...p, studentCount: sum }));
+      if (selectedBranchId === 'all') {
+        const sum = parts.reduce((a, b) => a + b, 0);
+        updateCurrentPlan((p) => ({ ...p, studentCount: sum }));
+      } else {
+        const targetIdx = selectedBranchId === 'branch_1' ? 0 : 1;
+        if (parts[targetIdx] !== undefined) {
+          updateCurrentPlan((p) => ({ ...p, studentCount: parts[targetIdx] }));
+        }
+      }
+    }
+  };
+
+  // Thay đổi sĩ số học sinh đồng bộ
+  const handleStudentCountChange = (cnt: number) => {
+    updateCurrentPlan((p) => ({ ...p, studentCount: cnt }));
+    if (selectedBranchId !== 'all') {
+      const targetIdx = selectedBranchId === 'branch_1' ? 0 : 1;
+      const parts = branchInput.split(';').map((s) => parseInt(s.trim(), 10) || 0);
+      if (parts[targetIdx] !== undefined) {
+        parts[targetIdx] = cnt;
+        setBranchInput(parts.join(';'));
+      }
     }
   };
 
@@ -1298,9 +1318,7 @@ export default function PMSDashboardPage() {
                 canApproveMenu={rolePerm.canApproveMenu}
                 canLockMenu={rolePerm.canLockMenu}
                 studentCount={currentPlan.studentCount}
-                onStudentCountChange={(cnt) =>
-                  updateCurrentPlan((p) => ({ ...p, studentCount: cnt }))
-                }
+                onStudentCountChange={handleStudentCountChange}
                 onFetchAttendanceCount={handleFetchAttendanceCount}
                 selectedBranchId={selectedBranchId}
                 onBranchSelect={handleBranchSelect}
