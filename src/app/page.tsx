@@ -21,7 +21,6 @@ import { downloadExcelInBrowser } from '../lib/excel/exporter';
 import { formatNumber, formatCurrency } from '../lib/utils';
 import { UserRole, ROLE_PERMISSIONS } from '../types/auth';
 import { SyncStatus, checkSupabaseConnection } from '../lib/supabase/client';
-import { saveDailyMenuToSupabase, saveAttendanceToSupabase } from '../lib/supabase/repository';
 import { STANDARD_FOOD_CATALOG } from '../data/standard-foods';
 
 import { AppTab } from '../components/navigation/TopNavBar';
@@ -300,20 +299,16 @@ export default function PMSDashboardPage() {
       ? totals.branchCosts[selectedBranchId]
       : totals.totalCost;
 
-  // Hàm kích hoạt đồng bộ Supabase Cloud (Optimistic UI + Background Sync)
+  // Hàm kích hoạt đồng bộ Supabase Cloud qua MenuService (OOP API Route)
   const triggerCloudSync = useCallback(async () => {
     setSyncStatus('syncing');
     try {
-      const res = await saveDailyMenuToSupabase({
-        date: currentPlan.date,
-        segment: currentPlan.ageGroup === 'ansang' ? 'ansang' : currentPlan.ageGroup,
-        studentCount: currentPlan.studentCount,
-        budgetPerStudent: currentPlan.mealPricePerChild,
-        status: currentPlan.status,
-        items: currentPlan.items,
-        summary: totals,
+      const res = await fetch('/api/menus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: currentPlan, totals }),
       });
-      if (res.success) {
+      if (res.ok) {
         setSyncStatus('synced');
         setSyncError(null);
       } else {
@@ -912,19 +907,24 @@ export default function PMSDashboardPage() {
       })
     );
 
-    saveAttendanceToSupabase(
-      selectedDate,
-      updatedList.map((c) => ({
-        classroomId: c.id,
-        className: c.className,
-        totalRegistered: c.registeredCount,
-        absentCount: c.absentCount,
-        presentCount: c.actualCount,
-        excusedCount: c.absentCount,
-        unexcusedCount: 0,
-        notes: c.note,
-      }))
-    );
+    // Đồng bộ điểm danh qua API Route
+    fetch('/api/attendance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: selectedDate,
+        records: updatedList.map((c) => ({
+          classroom_id: c.id,
+          class_name: c.className,
+          total_registered: c.registeredCount,
+          absent_count: c.absentCount,
+          present_count: c.actualCount,
+          excused_count: c.absentCount,
+          unexcused_count: 0,
+          note: c.note ?? '',
+        })),
+      }),
+    }).catch((err) => console.warn('[AttendanceSync]', err));
 
     showToast(
       `✓ Đã đồng bộ sĩ số điểm danh: Mẫu giáo ${mgCount} cháu | Nhà trẻ ${ntCount} cháu | Ăn sáng ${asCount} cháu`,
