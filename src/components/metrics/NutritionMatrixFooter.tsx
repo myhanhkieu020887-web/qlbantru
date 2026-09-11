@@ -9,7 +9,7 @@ import {
 } from '../../types/nutrition';
 import { evaluateMealCaloDistribution } from '../../engine/atwater';
 import { formatCurrency, formatNumber } from '../../lib/utils';
-import { RefreshCw, Info, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Sparkles } from 'lucide-react';
+import { RefreshCw, Info, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Sparkles, Scale } from 'lucide-react';
 
 interface Props {
   computedItems: ComputedMenuItem[];
@@ -17,6 +17,7 @@ interface Props {
   ageGroup: AgeGroup;
   onRunSolver: () => void;
   isSolving?: boolean;
+  onScaleNutrientGroup?: (category: 'protein' | 'carbs' | 'fat' | 'veg', percent: number) => void;
 }
 
 export const NutritionMatrixFooter: React.FC<Props> = ({
@@ -25,9 +26,11 @@ export const NutritionMatrixFooter: React.FC<Props> = ({
   ageGroup,
   onRunSolver,
   isSolving = false,
+  onScaleNutrientGroup,
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [includeBreakfast, setIncludeBreakfast] = useState<boolean>(false);
+  const [isScaleOpen, setIsScaleOpen] = useState<boolean>(false);
   const isMauGiao = ageGroup === 'maugiao';
 
   // Định mức 1 ngày theo lứa tuổi (Mẫu giáo vs Nhà trẻ)
@@ -63,6 +66,124 @@ export const NutritionMatrixFooter: React.FC<Props> = ({
   // Đánh giá chung
   const isQuantityPass = totals.isCaloPass;
   const isQualityPass = totals.isRatioPass && totals.isAnimalProteinPass && totals.isPlantFatPass;
+
+  const renderScalePopover = () => {
+    if (!onScaleNutrientGroup || !isScaleOpen) return null;
+    return (
+      <div className="absolute right-0 bottom-full mb-1.5 w-72 bg-white border border-slate-300 rounded-xl shadow-xl p-3 z-50 text-[11px] space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-150">
+        <div className="flex items-center justify-between font-bold text-slate-800 pb-1.5 border-b border-slate-100">
+          <span className="flex items-center gap-1.5">
+            <Scale className="w-3.5 h-3.5 text-amber-600" />
+            <span>Co giãn định lượng nhanh (%)</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setIsScaleOpen(false)}
+            className="text-slate-400 hover:text-slate-700 p-0.5 rounded"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          {/* Đạm */}
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-rose-700">Đạm (Thịt/Cá):</span>
+            <div className="flex items-center gap-1 font-mono font-bold">
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('protein', -2)}
+                className="px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition"
+              >
+                -2%
+              </button>
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('protein', 2)}
+                className="px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition"
+              >
+                +2%
+              </button>
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('protein', 5)}
+                className="px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition"
+              >
+                +5%
+              </button>
+            </div>
+          </div>
+
+          {/* Tinh bột */}
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-amber-800">Tinh bột (Gạo):</span>
+            <div className="flex items-center gap-1 font-mono font-bold">
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('carbs', -3)}
+                className="px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition"
+              >
+                -3%
+              </button>
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('carbs', 3)}
+                className="px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition"
+              >
+                +3%
+              </button>
+            </div>
+          </div>
+
+          {/* Rau củ */}
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-emerald-800">Rau củ:</span>
+            <div className="flex items-center gap-1 font-mono font-bold">
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('veg', -5)}
+                className="px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition"
+              >
+                -5%
+              </button>
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('veg', 5)}
+                className="px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition"
+              >
+                +5%
+              </button>
+            </div>
+          </div>
+
+          {/* Dầu mỡ */}
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-amber-700">Dầu mỡ:</span>
+            <div className="flex items-center gap-1 font-mono font-bold">
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('fat', -5)}
+                className="px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition"
+              >
+                -5%
+              </button>
+              <button
+                type="button"
+                onClick={() => onScaleNutrientGroup('fat', 5)}
+                className="px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition"
+              >
+                +5%
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-[9.5px] text-slate-400 italic pt-1 border-t border-slate-100">
+          * Dùng để vi chỉnh nhanh khẩu phần khi thừa hoặc thiếu nhẹ calo/tiền ăn.
+        </p>
+      </div>
+    );
+  };
 
   // NẾU ĐANG THU GỌN: Render Thanh Tóm Tắt Dinh Dưỡng Siêu Mỏng (Sticky 36px)
   if (!isExpanded) {
@@ -116,8 +237,23 @@ export const NutritionMatrixFooter: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Bên phải: Nút Cân đối thực đơn */}
-        <div className="flex items-center gap-2">
+        {/* Bên phải: Nút Cân đối thực đơn & Co giãn nhanh */}
+        <div className="flex items-center gap-2 relative">
+          {onScaleNutrientGroup && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsScaleOpen(!isScaleOpen)}
+                className="flex items-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 py-1 px-2 rounded font-semibold text-[11px] shadow-2xs transition active:scale-95 cursor-pointer"
+                title="Mở bảng vi chỉnh co giãn định lượng nhanh % đạm, bột, rau, dầu"
+              >
+                <Scale className="w-3 h-3 text-amber-600" />
+                <span>Co giãn % ▾</span>
+              </button>
+              {renderScalePopover()}
+            </div>
+          )}
+
           <button
             type="button"
             onClick={onRunSolver}
@@ -185,16 +321,32 @@ export const NutritionMatrixFooter: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* NÚT CAM NỔI BẬT CHUẨN QLMN: CÂN ĐỐI THỰC ĐƠN */}
-          <button
-            type="button"
-            onClick={onRunSolver}
-            disabled={isSolving}
-            className="w-full flex items-center justify-center gap-1.5 bg-[#f57c00] hover:bg-[#e65100] text-white py-1.5 px-3 rounded-lg font-bold text-xs shadow transition active:scale-95 disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSolving ? 'animate-spin' : ''}`} />
-            <span>{isSolving ? 'Đang cân đối...' : 'Cân đối thực đơn'}</span>
-          </button>
+          {/* CỤM NÚT CÂN ĐỐI THỰC ĐƠN & CO GIÃN NHANH */}
+          <div className="space-y-1.5 relative">
+            <button
+              type="button"
+              onClick={onRunSolver}
+              disabled={isSolving}
+              className="w-full flex items-center justify-center gap-1.5 bg-[#f57c00] hover:bg-[#e65100] text-white py-1.5 px-3 rounded-lg font-bold text-xs shadow transition active:scale-95 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSolving ? 'animate-spin' : ''}`} />
+              <span>{isSolving ? 'Đang cân đối...' : 'Cân đối thực đơn'}</span>
+            </button>
+
+            {onScaleNutrientGroup && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsScaleOpen(!isScaleOpen)}
+                  className="w-full flex items-center justify-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 py-1 px-2 rounded-lg font-semibold text-xs transition cursor-pointer"
+                >
+                  <Scale className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Co giãn định lượng nhanh % ▾</span>
+                </button>
+                {renderScalePopover()}
+              </div>
+            )}
+          </div>
 
           {/* CHÚ THÍCH TRẠNG THÁI TỒN KHO */}
           <div className="flex items-center justify-between text-[10px] text-slate-600 pt-1 border-t border-[#e0f0dc]">

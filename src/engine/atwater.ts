@@ -50,12 +50,13 @@ export function computeMenuItem(
   // Phân bổ cho từng điểm trường (Đ1, Đ2...) - Yêu cầu: Thực mua ở điểm trường luôn là số nguyên
   const branchBuyUnits: Record<string, number> = {};
   if (branches && branches.length > 0) {
+    const totalSchoolStudents = branches.reduce((sum, b) => sum + b.studentCount, 0) || studentCount;
     let sumBranches = 0;
     branches.forEach((b) => {
       if (item.branchQuantities && item.branchQuantities[b.id] !== undefined) {
         branchBuyUnits[b.id] = Math.round(item.branchQuantities[b.id]);
       } else {
-        const ratio = studentCount > 0 ? b.studentCount / studentCount : 0;
+        const ratio = totalSchoolStudents > 0 ? b.studentCount / totalSchoolStudents : 0;
         const rawVal = actualBuyUnit * ratio;
         // Thực mua tại điểm trường luôn là số nguyên
         branchBuyUnits[b.id] = Math.round(rawVal);
@@ -218,6 +219,22 @@ export function computeNutritionTotals(
     isCaPRatioPass &&
     isIronPass;
 
+  // Chi phí chi tiết từng điểm trường
+  const branchCosts: Record<string, number> = {};
+  if (branches && branches.length > 0) {
+    branches.forEach((b) => {
+      branchCosts[b.id] = 0;
+    });
+    for (const c of computedItems) {
+      const effectivePrice = c.food.contractPrice && c.food.contractPrice > 0 ? c.food.contractPrice : c.food.price;
+      if (c.branchBuyUnits) {
+        Object.entries(c.branchBuyUnits).forEach(([bId, qty]) => {
+          branchCosts[bId] = (branchCosts[bId] || 0) + qty * effectivePrice;
+        });
+      }
+    }
+  }
+
   return {
     computedItems,
     totals: {
@@ -227,6 +244,7 @@ export function computeNutritionTotals(
       totalCost,
       costPerChild,
       budgetDifference,
+      branchCosts,
       proteinAnimalG,
       proteinPlantG,
       totalProteinG,

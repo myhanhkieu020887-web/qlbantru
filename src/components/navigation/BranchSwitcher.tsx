@@ -18,25 +18,25 @@ export const BranchSwitcher: React.FC<BranchSwitcherProps> = ({
   totalStudents,
 }) => {
   return (
-    <div className="flex items-center gap-1 bg-slate-800/80 p-1 rounded-lg border border-slate-700/60 shadow-inner">
+    <div className="inline-flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200/80 text-[11px] shadow-2xs">
       {/* Nút Toàn trường */}
       <button
         type="button"
         onClick={() => onBranchChange('all')}
-        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+        className={`flex items-center gap-1 px-2 py-0.5 rounded-md transition-all ${
           selectedBranchId === 'all'
-            ? 'bg-blue-600 text-white shadow-sm'
-            : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+            ? 'bg-white text-blue-700 font-bold shadow-2xs border border-slate-200/60'
+            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
         }`}
         title={`Tổng hợp toàn trường: ${totalStudents} trẻ`}
       >
-        <Building2 className="w-3.5 h-3.5 text-blue-300" />
+        <Building2 className={`w-3 h-3 ${selectedBranchId === 'all' ? 'text-blue-600' : 'text-slate-400'}`} />
         <span>Toàn trường</span>
         <span
-          className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+          className={`font-mono text-[10px] px-1 py-0.1 rounded font-bold ${
             selectedBranchId === 'all'
-              ? 'bg-blue-700 text-blue-100'
-              : 'bg-slate-700 text-slate-300'
+              ? 'bg-blue-50 text-blue-700'
+              : 'bg-slate-200/70 text-slate-600'
           }`}
         >
           {totalStudents}
@@ -51,20 +51,20 @@ export const BranchSwitcher: React.FC<BranchSwitcherProps> = ({
             key={b.id}
             type="button"
             onClick={() => onBranchChange(b.id)}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold transition-all ${
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-md transition-all ${
               isSelected
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                ? 'bg-white text-emerald-700 font-bold shadow-2xs border border-slate-200/60'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
             }`}
             title={`${b.name}: ${b.studentCount} trẻ`}
           >
-            <School className="w-3 h-3 text-emerald-300" />
+            <School className={`w-3 h-3 ${isSelected ? 'text-emerald-600' : 'text-slate-400'}`} />
             <span>{b.name}</span>
             <span
-              className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+              className={`font-mono text-[10px] px-1 py-0.1 rounded font-bold ${
                 isSelected
-                  ? 'bg-emerald-700 text-emerald-100'
-                  : 'bg-slate-700 text-slate-300'
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'bg-slate-200/70 text-slate-600'
               }`}
             >
               {b.studentCount}

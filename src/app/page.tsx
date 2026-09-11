@@ -286,7 +286,6 @@ export default function PMSDashboardPage() {
       ? (currentBundle.cbgvnv || currentBundle.maugiao)
       : currentBundle.ansang;
 
-  // Tính toán dinh dưỡng thời gian thực
   const { computedItems, totals } = computeNutritionTotals(
     currentPlan.items,
     currentPlan.studentCount,
@@ -294,6 +293,12 @@ export default function PMSDashboardPage() {
     currentPlan.ageGroup,
     branches
   );
+
+  // Chi phí thực tế theo Điểm trường đang chọn (Đ1, Đ2, hoặc Toàn trường)
+  const effectiveBranchCost =
+    selectedBranchId !== 'all' && totals.branchCosts && totals.branchCosts[selectedBranchId] !== undefined
+      ? totals.branchCosts[selectedBranchId]
+      : totals.totalCost;
 
   // Hàm kích hoạt đồng bộ Supabase Cloud (Optimistic UI + Background Sync)
   const triggerCloudSync = useCallback(async () => {
@@ -1309,7 +1314,7 @@ export default function PMSDashboardPage() {
                 serviceFee={currentPlan.serviceFee || 0}
                 subsidyFee={currentPlan.subsidyFee || 0}
                 initialDifference={currentPlan.initialDifference || 0}
-                totalCost={totals.totalCost}
+                totalCost={effectiveBranchCost}
                 onAddFood={() => setIsAddModalOpen(true)}
                 onCopyZalo={handleCopyZaloPO}
                 onSave={() => {
@@ -1365,6 +1370,7 @@ export default function PMSDashboardPage() {
                 ageGroup={currentSegment}
                 onRunSolver={handleRunSolver}
                 isSolving={isSolving}
+                onScaleNutrientGroup={handleScaleNutrientGroup}
               />
             </main>
           </>

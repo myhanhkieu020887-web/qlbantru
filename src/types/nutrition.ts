@@ -118,6 +118,7 @@ export interface NutritionTotals {
   totalCost: number;
   costPerChild: number;
   budgetDifference: number;
+  branchCosts?: Record<string, number>;
 
   // Năng lượng Atwater
   proteinAnimalG: number;
