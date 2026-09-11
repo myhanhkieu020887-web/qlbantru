@@ -23,6 +23,8 @@ import {
   DollarSign,
   PlusCircle,
   ArrowUpRight,
+  Download,
+  Loader2,
 } from 'lucide-react';
 
 interface Props {
@@ -46,6 +48,52 @@ export const FinanceView: React.FC<Props> = ({
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
   const [paymentAmount, setPaymentAmount] = useState<number>(5000000);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
+
+  // State xuất báo cáo
+  const [isDownloadingSettlementPdf, setIsDownloadingSettlementPdf] = useState<boolean>(false);
+  const [isDownloadingNutritionExcel, setIsDownloadingNutritionExcel] = useState<boolean>(false);
+
+  const handleDownloadSettlementPdf = async () => {
+    setIsDownloadingSettlementPdf(true);
+    try {
+      const res = await fetch('/api/reports/settlement-pdf?month=9&year=2026&price=21000&days=20');
+      if (!res.ok) throw new Error('Không thể tải PDF quyết toán');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Quyet_toan_tien_an_thang_9_2026.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Có lỗi khi tải PDF quyết toán: ' + (err instanceof Error ? err.message : ''));
+    } finally {
+      setIsDownloadingSettlementPdf(false);
+    }
+  };
+
+  const handleDownloadNutritionExcel = async () => {
+    setIsDownloadingNutritionExcel(true);
+    try {
+      const res = await fetch('/api/reports/nutrition-excel?month=9&year=2026&segment=maugiao&students=1210&budget=21000');
+      if (!res.ok) throw new Error('Không thể tải file Excel dinh dưỡng');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Bao_cao_dinh_duong_thang_9_2026_maugiao.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Có lỗi khi tải Excel: ' + (err instanceof Error ? err.message : ''));
+    } finally {
+      setIsDownloadingNutritionExcel(false);
+    }
+  };
 
   // Thống kê Quyết toán C38-HD
   const totalAdvancePaid = settlements.reduce((sum, s) => sum + s.initialAdvancePaid, 0);
@@ -99,11 +147,31 @@ export const FinanceView: React.FC<Props> = ({
 
         <div className="flex items-center gap-2">
           <button
+            onClick={handleDownloadNutritionExcel}
+            disabled={isDownloadingNutritionExcel}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            title="Xuất file Excel báo cáo dinh dưỡng 30 ngày trong tháng"
+          >
+            {isDownloadingNutritionExcel ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            <span>{isDownloadingNutritionExcel ? 'Đang tạo Excel...' : 'Excel Dinh Dưỡng Tháng'}</span>
+          </button>
+
+          <button
+            onClick={handleDownloadSettlementPdf}
+            disabled={isDownloadingSettlementPdf}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            title="Xuất bảng công khai quyết toán tiền ăn chuẩn A4 có chữ ký"
+          >
+            {isDownloadingSettlementPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            <span>{isDownloadingSettlementPdf ? 'Đang tạo PDF...' : 'PDF Quyết Toán A4'}</span>
+          </button>
+
+          <button
             onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-semibold border border-slate-300 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-semibold border border-slate-300 transition-colors cursor-pointer"
           >
             <Printer className="w-4 h-4" />
-            <span>In Bảng Quyết Toán</span>
+            <span>In nhanh (Ctrl+P)</span>
           </button>
         </div>
       </div>
