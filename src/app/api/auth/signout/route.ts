@@ -7,5 +7,8 @@ export async function POST(request: NextRequest) {
   await supabase.auth.signOut();
 
   const origin = new URL(request.url).origin;
-  return NextResponse.redirect(`${origin}/login`);
+  const response = NextResponse.redirect(`${origin}/login`);
+  response.cookies.delete('pms_demo_session');
+  response.cookies.delete('pms_user_role');
+  return response;
 }

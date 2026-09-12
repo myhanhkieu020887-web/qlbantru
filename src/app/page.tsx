@@ -120,6 +120,18 @@ export default function PMSDashboardPage() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('connected');
   const [syncError, setSyncError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const match = document.cookie.match(/pms_user_role=([^;]+)/);
+      if (match && match[1]) {
+        const role = match[1] as UserRole;
+        if (ROLE_PERMISSIONS[role]) {
+          setUserRole(role);
+        }
+      }
+    }
+  }, []);
+
   // 2. Quản lý Lịch tuần 5 ngày
   const [schedule, setSchedule] = useState<DayMenuBundle[]>(SEED_WEEKLY_SCHEDULE);
   const [selectedDate, setSelectedDate] = useState<string>('2026-09-09');
@@ -1268,6 +1280,9 @@ export default function PMSDashboardPage() {
         userRole={userRole}
         onRoleChange={(role) => {
           setUserRole(role);
+          if (typeof document !== 'undefined') {
+            document.cookie = `pms_user_role=${role}; path=/; max-age=86400; SameSite=Lax`;
+          }
           showToast(`Đã chuyển sang vai trò: ${ROLE_PERMISSIONS[role].title}`, 'info');
         }}
         syncStatus={syncStatus}

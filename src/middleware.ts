@@ -34,16 +34,18 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith('/login');
+  const isDemoSession = request.cookies.get('pms_demo_session')?.value === 'true';
+  const isAuthenticated = !!user || isDemoSession;
 
   // Nếu chưa đăng nhập và không ở trang login → redirect về /login
-  if (!user && !isAuthRoute) {
+  if (!isAuthenticated && !isAuthRoute) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
     return NextResponse.redirect(loginUrl);
   }
 
   // Nếu đã đăng nhập và vào /login → redirect về /
-  if (user && isAuthRoute) {
+  if (isAuthenticated && isAuthRoute) {
     const homeUrl = request.nextUrl.clone();
     homeUrl.pathname = '/';
     return NextResponse.redirect(homeUrl);
