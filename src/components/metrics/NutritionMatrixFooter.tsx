@@ -16,7 +16,9 @@ interface Props {
   totals: NutritionTotals;
   ageGroup: AgeGroup;
   onRunSolver: () => void;
+  onRunIntegerSolver?: () => void;
   isSolving?: boolean;
+  isIntegerSolving?: boolean;
   onScaleNutrientGroup?: (category: 'protein' | 'carbs' | 'fat' | 'veg', percent: number) => void;
 }
 
@@ -25,7 +27,9 @@ export const NutritionMatrixFooter: React.FC<Props> = ({
   totals,
   ageGroup,
   onRunSolver,
+  onRunIntegerSolver,
   isSolving = false,
+  isIntegerSolving = false,
   onScaleNutrientGroup,
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
@@ -254,14 +258,27 @@ export const NutritionMatrixFooter: React.FC<Props> = ({
             </div>
           )}
 
+          {onRunIntegerSolver && (
+            <button
+              type="button"
+              onClick={onRunIntegerSolver}
+              disabled={isIntegerSolving || isSolving}
+              className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white py-1 px-2.5 rounded font-bold text-[11px] shadow-xs transition active:scale-95 disabled:opacity-50 cursor-pointer"
+              title="Tự động tính toán làm tròn số lượng thực mua ĐVT thành số nguyên đi chợ, phân bổ bảo toàn điểm trường, đảm bảo Lượng: Đạt, Chất: Cân đối"
+            >
+              <Sparkles className={`w-3 h-3 text-amber-300 ${isIntegerSolving ? 'animate-spin' : ''}`} />
+              <span>{isIntegerSolving ? 'Đang làm tròn...' : '⚡ Cân đối số nguyên ĐVT'}</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onRunSolver}
-            disabled={isSolving}
-            className="flex items-center gap-1 bg-[#f57c00] hover:bg-[#e65100] text-white py-1 px-2.5 rounded font-bold text-[11px] shadow-xs transition active:scale-95 disabled:opacity-50"
+            disabled={isSolving || isIntegerSolving}
+            className="flex items-center gap-1 bg-[#f57c00] hover:bg-[#e65100] text-white py-1 px-2.5 rounded font-bold text-[11px] shadow-xs transition active:scale-95 disabled:opacity-50 cursor-pointer"
           >
             <RefreshCw className={`w-3 h-3 ${isSolving ? 'animate-spin' : ''}`} />
-            <span>{isSolving ? 'Đang cân đối...' : 'Cân đối thực đơn'}</span>
+            <span>{isSolving ? 'Đang cân đối...' : 'Cân đối thực đơn (F9)'}</span>
           </button>
         </div>
       </div>

@@ -31,6 +31,7 @@ interface Props {
   isLocked?: boolean;
   canEditNutrients?: boolean;
   onUpdateGam: (itemId: string, newGam: number) => void;
+  onUpdateTotalBuyUnit?: (itemId: string, newBuyUnit: number) => void;
   onUpdateBranchBuy?: (itemId: string, branchId: string, newQty: number) => void;
   onUpdatePrice?: (itemId: string, newPrice: number) => void;
   onToggleFixed: (itemId: string) => void;
@@ -62,6 +63,7 @@ export const NutritionGrid: React.FC<Props> = ({
   isLocked = false,
   canEditNutrients = true,
   onUpdateGam,
+  onUpdateTotalBuyUnit,
   onUpdateBranchBuy,
   onUpdatePrice,
   onToggleFixed,
@@ -481,8 +483,30 @@ export const NutritionGrid: React.FC<Props> = ({
                           })}
 
                           {/* Cột Tổng Thực Mua Theo ĐVT */}
-                          <td className="py-0.5 px-1 text-right border-r border-slate-200 font-mono font-bold text-slate-900 bg-amber-50/20 text-[11px]">
-                            {formatNumber(it.actualBuyUnit, 1)}
+                          <td className="py-0.2 px-0.5 border-r border-slate-200 text-right bg-amber-100/40">
+                            {onUpdateTotalBuyUnit ? (
+                              <input
+                                type="number"
+                                step={it.food.category === 'gia_vi' ? '0.1' : '1'}
+                                min="0"
+                                disabled={isInputDisabled}
+                                value={it.actualBuyUnit}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value);
+                                  onUpdateTotalBuyUnit(it.id, isNaN(val) ? 0 : val);
+                                }}
+                                title="Gõ trực tiếp số lượng thực mua ĐVT cả trường - Hệ thống tự động suy ngược ra gam/trẻ và chia đều cho điểm trường"
+                                className={`w-full text-right font-mono font-bold px-1 py-0.2 rounded text-[11px] focus:outline-none ${
+                                  isInputDisabled
+                                    ? 'bg-transparent text-slate-500 cursor-not-allowed'
+                                    : 'text-amber-950 bg-transparent hover:bg-white focus:bg-white border border-transparent focus:border-amber-600 focus:ring-1 focus:ring-amber-500'
+                                }`}
+                              />
+                            ) : (
+                              <span className="font-mono font-bold text-slate-900 text-[11px] px-1">
+                                {formatNumber(it.actualBuyUnit, 1)}
+                              </span>
+                            )}
                           </td>
 
                           <td className="py-0.5 px-1 text-center border-r border-slate-200 text-slate-600 font-mono text-[10.5px]">

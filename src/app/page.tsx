@@ -16,7 +16,7 @@ import {
 import { SEED_WEEKLY_SCHEDULE } from '../data/seed-weekly-schedule';
 import { SEED_CLASS_ATTENDANCE } from '../data/seed-attendance';
 import { computeNutritionTotals } from '../engine/atwater';
-import { solveNutritionMenu } from '../engine/milp-solver';
+import { solveNutritionMenu, solveIntegerBuyUnitsMenu } from '../engine/milp-solver';
 import { downloadExcelInBrowser } from '../lib/excel/exporter';
 import { formatNumber, formatCurrency } from '../lib/utils';
 import { UserRole, ROLE_PERMISSIONS } from '../types/auth';
@@ -177,6 +177,7 @@ export default function PMSDashboardPage() {
   const [isAuditDrawerOpen, setIsAuditDrawerOpen] = useState<boolean>(false);
   const [solverResult, setSolverResult] = useState<SolverResult | null>(null);
   const [isSolving, setIsSolving] = useState<boolean>(false);
+  const [isIntegerSolving, setIsIntegerSolving] = useState<boolean>(false);
 
   // 7. Quản lý Kho Bán Trú (FIFO)
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(SEED_INVENTORY_ITEMS);
@@ -446,13 +447,115 @@ export default function PMSDashboardPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleRunSolver]);
 
+  // Chạy Bộ giải tối ưu số lượng thực mua ĐVT số nguyên (Integer MILP Solver)
+  const handleRunIntegerSolver = useCallback((customOptions?: SolverOptions) => {
+    if (currentPlan.status === 'LOCKED') {
+      showToast('Thực đơn đã khóa sổ! Không thể cân đối lại.', 'error');
+      return;
+    }
+
+    setIsIntegerSolving(true);
+    const optionsToUse = customOptions || solverConfig;
+    const res = solveIntegerBuyUnitsMenu(
+      currentPlan.items,
+      currentPlan.studentCount,
+      currentPlan.ageGroup,
+      branches,
+      {
+        targetBudgetPerChild: currentPlan.mealPricePerChild,
+        ...optionsToUse,
+      }
+    );
+    setIsIntegerSolving(false);
+    setSolverResult(res);
+
+    if (res.success) {
+      updateCurrentPlan((prev) => ({
+        ...prev,
+        items: res.items,
+        status: 'OPTIMIZED',
+      }));
+      showToast(res.message, 'success');
+      triggerCloudSync();
+    } else {
+      showToast(res.message, 'error');
+    }
+  }, [currentPlan, updateCurrentPlan, triggerCloudSync, solverConfig, branches]);
+
+  // Nhập trực tiếp ô Tổng thực mua ĐVT: suy ngược ra gam/trẻ và phân bổ điểm trường bảo toàn
+  const handleUpdateTotalBuyUnit = (itemId: string, newBuyUnit: number) => {
+    if (currentPlan.status === 'LOCKED') return;
+    const safeBuyUnit = Math.max(0, newBuyUnit);
+
+    updateCurrentPlan((prev) => {
+      const totalStudents = branches.length > 0
+        ? branches.reduce((sum, b) => sum + b.studentCount, 0)
+        : prev.studentCount;
+
+      const newItems = prev.items.map((it) => {
+        if (it.id !== itemId) return it;
+
+        const food = it.food;
+        const waste = food.wasteFactor || 0;
+        const exchange = food.gamExchange || 1000;
+
+        // Phân bổ tỷ lệ số nguyên cho từng điểm trường (Hare-Niemeyer)
+        const branchQtys: Record<string, number> = {};
+        if (branches.length > 0) {
+          const intTotal = Math.round(safeBuyUnit);
+          let allocatedSum = 0;
+          const quotas = branches.map((b) => {
+            const q = (intTotal * b.studentCount) / totalStudents;
+            const floor = Math.floor(q);
+            allocatedSum += floor;
+            return { id: b.id, floor, fraction: q - floor };
+          });
+
+          let rem = intTotal - allocatedSum;
+          quotas.sort((a, b) => b.fraction - a.fraction);
+          quotas.forEach((q) => {
+            const add = rem > 0 ? 1 : 0;
+            if (rem > 0) rem--;
+            branchQtys[q.id] = q.floor + add;
+          });
+        }
+
+        // Công thức suy ngược bảo toàn:
+        // gam/trẻ = (Thực mua ĐVT * gamExchange / 1000) * (1 - waste/100) * 1000 / N
+        const finalBuyKg = (safeBuyUnit * exchange) / 1000;
+        const finalEatKg = finalBuyKg * (1 - waste / 100);
+        const derivedGamPerChild = totalStudents > 0 ? (finalEatKg * 1000) / totalStudents : it.gamPerChild;
+
+        return {
+          ...it,
+          customTotalBuy: safeBuyUnit,
+          branchQuantities: branchQtys,
+          gamPerChild: Math.round(derivedGamPerChild * 10) / 10,
+        };
+      });
+
+      return {
+        ...prev,
+        items: newItems,
+        status: prev.status === 'APPROVED' ? 'DRAFT' : prev.status,
+      };
+    });
+  };
+
   // Cập nhật định lượng gam 1 trẻ
   const handleUpdateGam = (itemId: string, newGam: number) => {
     if (currentPlan.status === 'LOCKED') return;
     updateCurrentPlan((prev) => ({
       ...prev,
       items: prev.items.map((it) =>
-        it.id === itemId ? { ...it, gamPerChild: Math.max(0, newGam) } : it
+        it.id === itemId
+          ? {
+              ...it,
+              gamPerChild: Math.max(0, newGam),
+              customTotalBuy: undefined, // Reset gõ tay tổng mua khi người dùng sửa định lượng gam
+              branchQuantities: undefined,
+            }
+          : it
       ),
       status: prev.status === 'APPROVED' ? 'DRAFT' : prev.status,
     }));
@@ -463,16 +566,30 @@ export default function PMSDashboardPage() {
     if (currentPlan.status === 'LOCKED') return;
     const roundedQty = Math.max(0, Math.round(newQty));
     updateCurrentPlan((prev) => {
+      const totalStudents = branches.length > 0
+        ? branches.reduce((sum, b) => sum + b.studentCount, 0)
+        : prev.studentCount;
+
       const newItems = prev.items.map((it) => {
         if (it.id !== itemId) return it;
         const currentBranchQtys = it.branchQuantities ? { ...it.branchQuantities } : {};
         currentBranchQtys[branchId] = roundedQty;
         // Tổng mua điểm trường = tổng số nguyên các điểm
         const customTotal = Object.values(currentBranchQtys).reduce((sum, v) => sum + v, 0);
+
+        // Đồng bộ suy ngược ra gam/trẻ
+        const food = it.food;
+        const waste = food.wasteFactor || 0;
+        const exchange = food.gamExchange || 1000;
+        const finalBuyKg = (customTotal * exchange) / 1000;
+        const finalEatKg = finalBuyKg * (1 - waste / 100);
+        const derivedGamPerChild = totalStudents > 0 ? (finalEatKg * 1000) / totalStudents : it.gamPerChild;
+
         return {
           ...it,
           branchQuantities: currentBranchQtys,
           customTotalBuy: customTotal,
+          gamPerChild: Math.round(derivedGamPerChild * 10) / 10,
         };
       });
       return {
@@ -1500,6 +1617,8 @@ export default function PMSDashboardPage() {
                 onOpenAuto20DaysModal={() => setIsAuto20DaysModalOpen(true)}
                 onOpenAiSuggest={() => setIsAiSuggestOpen(true)}
                 onOpenSolverConfig={() => setIsSolverConfigOpen(true)}
+                onRunIntegerSolver={handleRunIntegerSolver}
+                isIntegerSolving={isIntegerSolving}
                 onOpenWorkflowGuide={() => setIsWorkflowGuideOpen(true)}
                 onOpenExcelImport={() => setIsExcelImportOpen(true)}
                 onExportBranchExcel={handleExportBranchMarketExcel}
@@ -1537,6 +1656,7 @@ export default function PMSDashboardPage() {
                 isLocked={isLocked}
                 canEditNutrients={rolePerm.canEditNutrients}
                 onUpdateGam={handleUpdateGam}
+                onUpdateTotalBuyUnit={handleUpdateTotalBuyUnit}
                 onUpdateBranchBuy={handleUpdateBranchBuy}
                 onToggleFixed={handleToggleFixed}
                 onRemoveItem={handleRemoveItem}
@@ -1550,7 +1670,9 @@ export default function PMSDashboardPage() {
                 totals={totals}
                 ageGroup={currentSegment}
                 onRunSolver={handleRunSolver}
+                onRunIntegerSolver={handleRunIntegerSolver}
                 isSolving={isSolving}
+                isIntegerSolving={isIntegerSolving}
                 onScaleNutrientGroup={handleScaleNutrientGroup}
               />
             </main>

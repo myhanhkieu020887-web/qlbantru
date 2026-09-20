@@ -56,6 +56,8 @@ interface Props {
   onOpenAuto20DaysModal?: () => void;
   onOpenAiSuggest?: () => void;
   onOpenSolverConfig?: () => void;
+  onRunIntegerSolver?: () => void;
+  isIntegerSolving?: boolean;
   onOpenWorkflowGuide?: () => void;
   onOpenExcelImport?: () => void;
   onExportBranchExcel?: () => void;
@@ -97,6 +99,8 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
   onOpenAuto20DaysModal,
   onOpenAiSuggest,
   onOpenSolverConfig,
+  onRunIntegerSolver,
+  isIntegerSolving = false,
   onOpenWorkflowGuide,
   onOpenExcelImport,
   onExportBranchExcel,
@@ -256,6 +260,19 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
               >
                 <Sparkles className="w-3 h-3 text-purple-600 animate-pulse" />
                 <span className="hidden md:inline">Gợi ý AI</span>
+              </button>
+            )}
+
+            {onRunIntegerSolver && (
+              <button
+                type="button"
+                onClick={onRunIntegerSolver}
+                disabled={isIntegerSolving}
+                className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 rounded transition cursor-pointer"
+                title="Tự động tối ưu hóa số lượng thực mua ĐVT thành số nguyên đi chợ, phân bổ bảo toàn điểm trường, đảm bảo Lượng: Đạt, Chất: Cân đối"
+              >
+                <Sparkles className={`w-3 h-3 text-amber-500 ${isIntegerSolving ? 'animate-spin' : ''}`} />
+                <span className="hidden md:inline">{isIntegerSolving ? 'Đang tính...' : 'Làm tròn ĐVT'}</span>
               </button>
             )}
 

@@ -43,7 +43,9 @@ export function computeMenuItem(
   }
 
   // Quy đổi thực mua theo Đơn vị tính (ĐVT)
-  let actualBuyUnit = food.gamExchange > 0 
+  let actualBuyUnit = item.customTotalBuy !== undefined && item.customTotalBuy >= 0
+    ? item.customTotalBuy
+    : food.gamExchange > 0 
     ? (actualBuyKg * 1000) / food.gamExchange 
     : actualBuyKg;
 
@@ -52,20 +54,53 @@ export function computeMenuItem(
   if (branches && branches.length > 0) {
     const totalSchoolStudents = branches.reduce((sum, b) => sum + b.studentCount, 0) || studentCount;
     let sumBranches = 0;
-    branches.forEach((b) => {
-      if (item.branchQuantities && item.branchQuantities[b.id] !== undefined) {
-        branchBuyUnits[b.id] = Math.round(item.branchQuantities[b.id]);
-      } else {
-        const ratio = totalSchoolStudents > 0 ? b.studentCount / totalSchoolStudents : 0;
-        const rawVal = actualBuyUnit * ratio;
-        // Thực mua tại điểm trường luôn là số nguyên
-        branchBuyUnits[b.id] = Math.round(rawVal);
-      }
-      sumBranches += branchBuyUnits[b.id];
-    });
 
-    // Cập nhật tổng thực mua theo số nguyên của các điểm trường
-    actualBuyUnit = sumBranches;
+    // Kiểm tra xem người dùng có gõ tay từng điểm trường hay không
+    const hasManualBranchQtys = item.branchQuantities && Object.keys(item.branchQuantities).length > 0;
+
+    if (hasManualBranchQtys && item.customTotalBuy === undefined) {
+      branches.forEach((b) => {
+        branchBuyUnits[b.id] = Math.round(item.branchQuantities?.[b.id] ?? 0);
+        sumBranches += branchBuyUnits[b.id];
+      });
+      actualBuyUnit = sumBranches;
+    } else {
+      // Phân bổ tỷ lệ Hare-Niemeyer / Largest Remainder từ tổng actualBuyUnit để bảo toàn tổng số nguyên
+      const integerTotal = Math.round(actualBuyUnit);
+      actualBuyUnit = integerTotal;
+
+      const exactQuotas = branches.map((b) => ({
+        id: b.id,
+        quota: totalSchoolStudents > 0 ? (integerTotal * b.studentCount) / totalSchoolStudents : 0,
+      }));
+
+      // Lấy phần nguyên ban đầu
+      let allocatedSum = 0;
+      const remains = exactQuotas.map((eq) => {
+        const floorVal = Math.floor(eq.quota);
+        allocatedSum += floorVal;
+        return {
+          id: eq.id,
+          floor: floorVal,
+          fraction: eq.quota - floorVal,
+        };
+      });
+
+      // Phân bổ phần dư lớn nhất cho các điểm trường đến khi đủ integerTotal
+      let remainderToDistribute = integerTotal - allocatedSum;
+      remains.sort((a, b) => b.fraction - a.fraction);
+
+      remains.forEach((r) => {
+        let add = 0;
+        if (remainderToDistribute > 0) {
+          add = 1;
+          remainderToDistribute--;
+        }
+        branchBuyUnits[r.id] = r.floor + add;
+        sumBranches += branchBuyUnits[r.id];
+      });
+    }
+
     actualBuyKg = food.gamExchange > 0 ? (actualBuyUnit * food.gamExchange) / 1000 : actualBuyUnit;
   }
 
