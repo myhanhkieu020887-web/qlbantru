@@ -131,8 +131,20 @@ export function computeMenuItem(
     ? (branchBuyUnits[selectedBranchId] ?? 0) * effectivePrice
     : totalPrice;
 
-  // Dinh dưỡng tính trên 1 trẻ (gamPerChild / 100)
-  const factor = gamPerChild / 100;
+  // Dinh dưỡng tính trên 1 trẻ:
+  // Nếu đang xem một điểm trường cụ thể và đã có phân bổ thực mua riêng cho điểm trường đó
+  let effectiveGamForChild = gamPerChild;
+  if (selectedBranchId && selectedBranchId !== 'all' && branchBuyUnits && branchBuyUnits[selectedBranchId] !== undefined) {
+    const bObj = branches?.find((b) => b.id === selectedBranchId);
+    if (bObj && bObj.studentCount > 0) {
+      const bUnit = branchBuyUnits[selectedBranchId];
+      const bBuyKg = food.gamExchange > 0 ? (bUnit * food.gamExchange) / 1000 : bUnit;
+      const bEatKg = bBuyKg * (1 - (food.wasteFactor || 0) / 100);
+      effectiveGamForChild = (bEatKg * 1000) / bObj.studentCount;
+    }
+  }
+
+  const factor = effectiveGamForChild / 100;
   const pTotal = food.protein100g * factor;
   const fTotal = food.fat100g * factor;
   const carbs = food.carbs100g * factor;

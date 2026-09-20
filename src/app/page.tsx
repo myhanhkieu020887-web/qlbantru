@@ -448,8 +448,8 @@ export default function PMSDashboardPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleRunSolver]);
 
-  // Chạy Bộ giải tối ưu số lượng thực mua ĐVT số nguyên (Integer MILP Solver)
-  const handleRunIntegerSolver = useCallback((customOptions?: SolverOptions) => {
+  // Chạy Bộ giải tối ưu số lượng thực mua ĐVT số nguyên (Integer MILP Solver với HiGHS WASM)
+  const handleRunIntegerSolver = useCallback(async (customOptions?: SolverOptions) => {
     if (currentPlan.status === 'LOCKED') {
       showToast('Thực đơn đã khóa sổ! Không thể cân đối lại.', 'error');
       return;
@@ -457,31 +457,37 @@ export default function PMSDashboardPage() {
 
     setIsIntegerSolving(true);
     const optionsToUse = customOptions || solverConfig;
-    const res = solveIntegerBuyUnitsMenu(
-      currentPlan.items,
-      currentPlan.studentCount,
-      currentPlan.ageGroup,
-      branches,
-      {
-        targetBudgetPerChild: currentPlan.mealPricePerChild,
-        ...optionsToUse,
-      }
-    );
-    setIsIntegerSolving(false);
-    setSolverResult(res);
+    try {
+      const res = await solveIntegerBuyUnitsMenu(
+        currentPlan.items,
+        currentPlan.studentCount,
+        currentPlan.ageGroup,
+        branches,
+        {
+          targetBudgetPerChild: currentPlan.mealPricePerChild,
+          ...optionsToUse,
+        },
+        selectedBranchId
+      );
+      setIsIntegerSolving(false);
+      setSolverResult(res);
 
-    if (res.success) {
-      updateCurrentPlan((prev) => ({
-        ...prev,
-        items: res.items,
-        status: 'OPTIMIZED',
-      }));
-      showToast(res.message, 'success');
-      triggerCloudSync();
-    } else {
-      showToast(res.message, 'error');
+      if (res.success) {
+        updateCurrentPlan((prev) => ({
+          ...prev,
+          items: res.items,
+          status: 'OPTIMIZED',
+        }));
+        showToast(res.message, 'success');
+        triggerCloudSync();
+      } else {
+        showToast(res.message, 'error');
+      }
+    } catch (err) {
+      setIsIntegerSolving(false);
+      showToast(err instanceof Error ? err.message : 'Lỗi khi chạy bộ giải tối ưu', 'error');
     }
-  }, [currentPlan, updateCurrentPlan, triggerCloudSync, solverConfig, branches]);
+  }, [currentPlan, updateCurrentPlan, triggerCloudSync, solverConfig, branches, selectedBranchId]);
 
   // Nhập trực tiếp ô Tổng thực mua ĐVT: suy ngược ra gam/trẻ và phân bổ điểm trường bảo toàn
   const handleUpdateTotalBuyUnit = (itemId: string, newBuyUnit: number) => {
@@ -1830,6 +1836,7 @@ export default function PMSDashboardPage() {
                 isSolving={isSolving}
                 isIntegerSolving={isIntegerSolving}
                 onScaleNutrientGroup={handleScaleNutrientGroup}
+                selectedBranchId={selectedBranchId}
               />
             </main>
           </>

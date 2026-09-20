@@ -20,6 +20,7 @@ interface Props {
   isSolving?: boolean;
   isIntegerSolving?: boolean;
   onScaleNutrientGroup?: (category: 'protein' | 'carbs' | 'fat' | 'veg', percent: number) => void;
+  selectedBranchId?: string;
 }
 
 export const NutritionMatrixFooter: React.FC<Props> = ({
@@ -31,6 +32,7 @@ export const NutritionMatrixFooter: React.FC<Props> = ({
   isSolving = false,
   isIntegerSolving = false,
   onScaleNutrientGroup,
+  selectedBranchId = 'all',
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [includeBreakfast, setIncludeBreakfast] = useState<boolean>(false);
@@ -264,10 +266,16 @@ export const NutritionMatrixFooter: React.FC<Props> = ({
               onClick={onRunIntegerSolver}
               disabled={isIntegerSolving || isSolving}
               className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white py-1 px-2.5 rounded font-bold text-[11px] shadow-xs transition active:scale-95 disabled:opacity-50 cursor-pointer"
-              title="Tự động tính toán làm tròn số lượng thực mua ĐVT thành số nguyên đi chợ, phân bổ bảo toàn điểm trường, đảm bảo Lượng: Đạt, Chất: Cân đối"
+              title={`Cân đối độc lập bằng HiGHS WASM MILP cho ${
+                selectedBranchId === 'branch_1' ? 'Cơ sở chính (Đ1)' : selectedBranchId === 'branch_2' ? 'Phân hiệu (Đ2)' : 'Toàn trường'
+              }`}
             >
               <Sparkles className={`w-3 h-3 text-amber-300 ${isIntegerSolving ? 'animate-spin' : ''}`} />
-              <span>{isIntegerSolving ? 'Đang làm tròn...' : '⚡ Cân đối số nguyên ĐVT'}</span>
+              <span>
+                {isIntegerSolving
+                  ? 'Đang giải HiGHS...'
+                  : `⚡ Cân đối ${selectedBranchId === 'branch_1' ? 'Đ1' : selectedBranchId === 'branch_2' ? 'Đ2' : 'Toàn trường'}`}
+              </span>
             </button>
           )}
 
