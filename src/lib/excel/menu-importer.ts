@@ -1,3 +1,4 @@
+import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { AgeGroup, MenuItem, MealSession, FoodItem } from '@/types/nutrition';
 import { STANDARD_FOOD_CATALOG } from '@/data/standard-foods';
@@ -11,12 +12,19 @@ export interface ParsedMenuItem {
   dishName?: string;
   unit?: string;
   price?: number;
+  wasteFactor?: number;
+  buyQuantity?: number;
   warning?: string;
 }
 
 export interface ParsedDayMenu {
   date?: string;
   dayOfWeek?: string;
+  sheetName?: string;
+  targetGroup?: 'maugiao' | 'ansang' | 'nhatre';
+  studentCount?: number;
+  pricePerChild?: number;
+  branchName?: string; // 'Cơ sở chính (Đ1)' hoặc 'Phân hiệu (Đ2)'
   menuTitle: {
     sang?: string;
     trua?: string;
@@ -35,10 +43,11 @@ export interface MenuImportResult {
   days: ParsedDayMenu[];
   totalItems: number;
   matchedItemsCount: number;
+  branchDetected?: 'diemchinh' | 'phanhieu' | 'unknown';
 }
 
 // Chuẩn hóa chuỗi tìm kiếm tiếng Việt (bỏ dấu, thường hóa)
-function normalizeText(text: string): string {
+export function normalizeText(text: string): string {
   return text
     .toLowerCase()
     .normalize('NFD')
@@ -61,16 +70,19 @@ export function findBestMatchingFood(rawName: string): FoodItem | null {
   // 2. Khớp chuỗi con (tên chứa từ khóa)
   matched = STANDARD_FOOD_CATALOG.find((f) => {
     const fNorm = normalizeText(f.name);
-    return fNorm.includes(norm) || norm.includes(fNorm);
+    return fNorm === norm || fNorm.includes(norm) || norm.includes(fNorm);
   });
   if (matched) return matched;
 
   // 3. Khớp các từ khóa thông dụng phổ biến
   const keywordsMap: Record<string, string> = {
-    'thit heo': 'THIT_HEO_NAC',
-    'thit lon': 'THIT_HEO_NAC',
+    'thit heo': 'THIT_NAC_VAI',
+    'thit lon': 'THIT_NAC_VAI',
+    'thit nac vai': 'THIT_NAC_VAI',
+    'thit ba chi': 'THIT_BA_CHI',
     'thit bo': 'THIT_BO_FILE',
-    'thit ga': 'THIT_GA_PHI_LE',
+    'thit ga': 'GA_TA_NGUYEN_CON',
+    'ga ta': 'GA_TA_NGUYEN_CON',
     'ca nac': 'CA_NAC',
     'ca': 'CA_NAC',
     'tom': 'TOM_DONG',
@@ -79,12 +91,14 @@ export function findBestMatchingFood(rawName: string): FoodItem | null {
     'dau hu': 'DAU_PHU',
     'tau hu': 'DAU_PHU',
     'dau phu': 'DAU_PHU',
+    'dau cove': 'DAU_COVE',
     'gao': 'GAO_THOM',
     'com': 'GAO_THOM',
     'bun': 'BUN_TUOI',
     'pho': 'BUN_TUOI',
     'mi': 'BUN_TUOI',
-    'sua': 'SUA_BOT_GROW',
+    'smarta grow': 'SMARTA_GROW',
+    'metacare': 'METACARE_ECO_180',
     'sua tuoi': 'SUA_TUOI_TIET_TRUNG',
     'sua chua': 'SUA_CHUA',
     'bi do': 'BI_DO',
@@ -92,16 +106,27 @@ export function findBestMatchingFood(rawName: string): FoodItem | null {
     'muop': 'MUOP',
     'rau ngot': 'RAU_NGOT',
     'rau muong': 'RAU_MUONG',
+    'rau can': 'RAU_CAN',
+    'rau ngo': 'RAU_NGO_HAI',
     'ca rot': 'CA_ROT',
+    'ca chua': 'CA_CHUA',
+    'cu cai': 'CU_CAI_TRANG',
     'khoai tay': 'KHOAI_TAY',
     'dau an': 'DAU_MEIZAN',
-    'mo': 'MO_LON',
+    'mo lon': 'MO_LON_SONG',
+    'mo': 'MO_LON_SONG',
     'nuoc mam': 'NUOC_MAM',
     'duong': 'DUONG_CAT',
     'muoi': 'MUOI_IOT',
-    'chuoi': 'CHUOI_TIEU',
-    'du du': 'DU_DU',
-    'dua hau': 'DUA_HAU',
+    'tieu': 'HAT_TIEU',
+    'toi': 'TOI',
+    'gung': 'GUNG_CU',
+    'hanh cu': 'HANH_CU_TUOI',
+    'hanh la': 'HANH_LA',
+    'dua ta': 'DUA_TA',
+    'thom': 'DUA_TA',
+    'mit': 'MIT',
+    'bong cai': 'BONG_CAI_XANH',
   };
 
   for (const [kw, code] of Object.entries(keywordsMap)) {
@@ -127,15 +152,201 @@ function mapMealSession(sessionText: string): MealSession {
 }
 
 /**
- * Phân tích file Excel thực đơn (Buffer)
+ * Phân tích sheet chuyên biệt dạng "KẾT QUẢ KHẨU PHẦN DINH DƯỠNG" từ phần mềm mầm non
+ */
+function parseSchoolStandardSheet(
+  sheetData: unknown[][],
+  sheetName: string
+): ParsedDayMenu | null {
+  if (!sheetData || sheetData.length < 10) return null;
+
+  let dateStr = '';
+  let studentCount = 0;
+  let pricePerChild = 0;
+  let dishLunch = '';
+  let dishSnack = '';
+  let dishSub = '';
+  let dishBreakfast = '';
+
+  const isAnSang = normalizeText(sheetName).includes('sang');
+
+  // Quét 10 dòng đầu để lấy metadata (Sĩ số, Ngày, Món ăn)
+  for (let r = 0; r < Math.min(10, sheetData.length); r++) {
+    const row = sheetData[r];
+    if (!row || !Array.isArray(row)) continue;
+
+    for (let c = 0; c < row.length; c++) {
+      const cell = String(row[c] || '').trim();
+
+      if (cell.includes('Ngày điều chỉnh:')) {
+        const next = String(row[c + 1] || '').trim();
+        if (next) dateStr = next;
+      }
+
+      if (cell.includes('Sĩ số:')) {
+        const next = String(row[c + 1] || '').trim();
+        const m = next.match(/(\d+)\s*x\s*([0-9.,]+)/);
+        if (m) {
+          studentCount = parseInt(m[1], 10);
+          pricePerChild = parseFloat(m[2].replace(/[.,]/g, ''));
+        }
+      }
+
+      if (cell === 'Bữa trưa:') {
+        for (let k = c + 1; k < row.length; k++) {
+          const val = String(row[k] || '').trim();
+          if (val && !val.includes('Bữa')) {
+            dishLunch = val;
+            break;
+          }
+        }
+      }
+
+      if (cell === 'Bữa xế:') {
+        for (let k = c + 1; k < row.length; k++) {
+          const val = String(row[k] || '').trim();
+          if (val && !val.includes('Bữa')) {
+            dishSnack = val;
+            break;
+          }
+        }
+      }
+
+      if (cell === 'Bữa ăn phụ:') {
+        for (let k = c + 1; k < row.length; k++) {
+          const val = String(row[k] || '').trim();
+          if (val && !val.includes('Bữa')) {
+            dishSub = val;
+            break;
+          }
+        }
+      }
+
+      if (cell === 'Bữa sáng:') {
+        for (let k = c + 1; k < row.length; k++) {
+          const val = String(row[k] || '').trim();
+          if (val && !val.includes('Bữa')) {
+            dishBreakfast = val;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Quét bảng thực phẩm: bắt đầu từ dòng sau header (dòng 10)
+  const items: ParsedMenuItem[] = [];
+  let unmatched = 0;
+
+  for (let r = 10; r < sheetData.length; r++) {
+    const row = sheetData[r];
+    if (!row || !Array.isArray(row)) continue;
+
+    const stt = row[0];
+    const rawName = String(row[1] || '').trim();
+
+    // Dừng khi gặp dòng tổng kết
+    if (
+      !rawName ||
+      rawName.includes('Tổng cộng') ||
+      rawName.includes('Định mức') ||
+      rawName.includes('Tỉ lệ') ||
+      rawName.includes('Người lập') ||
+      !stt ||
+      isNaN(parseInt(String(stt), 10))
+    ) {
+      if (rawName && !rawName.includes('Tổng cộng') && !rawName.includes('Định mức') && !rawName.includes('Tỉ lệ') && !rawName.includes('Người lập')) {
+        break;
+      }
+      continue;
+    }
+
+    const rawGam = parseFloat(String(row[2] || '0').trim().replace(',', '.'));
+    const rawPrice = parseFloat(String(row[3] || '0').trim().replace(/,/g, ''));
+    const rawWaste = parseFloat(String(row[5] || '0').trim().replace(',', '.'));
+    const rawBuy = parseFloat(String(row[6] || '0').trim().replace(',', '.'));
+    const rawUnit = String(row[8] || 'Kg').trim();
+
+    // Xác định bữa ăn dựa vào loại thực phẩm hoặc phân hệ
+    let session: MealSession = 'chinh_trua';
+    let assignedDish = dishLunch || 'Bữa trưa dinh dưỡng';
+
+    if (isAnSang) {
+      session = 'sang';
+      assignedDish = dishBreakfast || 'Cơm gà sáng';
+    } else {
+      const normN = normalizeText(rawName);
+      if (normN.includes('bun')) {
+        session = 'xe';
+        assignedDish = dishSnack || 'Bánh canh xế chiều';
+      } else if (normN.includes('sua')) {
+        session = 'phu_xe';
+        assignedDish = dishSub || 'Sữa dinh dưỡng';
+      } else if (normN.includes('mit') || normN.includes('chuoi') || normN.includes('du du') || normN.includes('dua hau')) {
+        session = 'phu_trua';
+        assignedDish = 'Tráng miệng';
+      } else {
+        session = 'chinh_trua';
+        assignedDish = dishLunch || 'Bữa trưa';
+      }
+    }
+
+    const matched = findBestMatchingFood(rawName);
+    if (!matched) unmatched++;
+
+    items.push({
+      foodName: rawName,
+      matchedFood: matched,
+      mealSession: session,
+      gamPerChild: isNaN(rawGam) || rawGam < 0 ? 0 : rawGam,
+      dishName: assignedDish,
+      unit: rawUnit || matched?.unit || 'Kg',
+      price: !isNaN(rawPrice) && rawPrice > 0 ? rawPrice : matched?.price,
+      wasteFactor: !isNaN(rawWaste) ? rawWaste : matched?.wasteFactor,
+      buyQuantity: !isNaN(rawBuy) ? rawBuy : undefined,
+      warning: matched ? undefined : 'Chưa khớp danh mục chuẩn Viện Dinh Dưỡng, dùng thông số mặc định',
+    });
+  }
+
+  if (items.length === 0) return null;
+
+  return {
+    date: dateStr || '22/09/2026',
+    sheetName,
+    targetGroup: isAnSang ? 'ansang' : 'maugiao',
+    studentCount: studentCount > 0 ? studentCount : (isAnSang ? 385 : 380),
+    pricePerChild: pricePerChild > 0 ? pricePerChild : (isAnSang ? 7000 : 21000),
+    branchName: studentCount >= 300 ? 'Cơ sở chính (Đ1)' : 'Phân hiệu (Đ2)',
+    menuTitle: {
+      sang: dishBreakfast,
+      trua: dishLunch,
+      xe: dishSnack,
+      phu_xe: dishSub,
+    },
+    items,
+    unmatchedCount: unmatched,
+  };
+}
+
+/**
+ * Phân tích file Excel thực đơn (Hỗ trợ cả .xls BIFF8 và .xlsx OpenXML)
  */
 export async function parseMenuExcel(buffer: Buffer): Promise<MenuImportResult> {
-  const workbook = new ExcelJS.Workbook();
-  // @ts-expect-error exceljs write/read buffer typing
-  await workbook.xlsx.load(buffer);
+  let wb: XLSX.WorkBook;
+  try {
+    wb = XLSX.read(buffer, { type: 'buffer' });
+  } catch (err) {
+    return {
+      success: false,
+      message: `Lỗi đọc file Excel: ${err instanceof Error ? err.message : 'Định dạng file không hợp lệ'}`,
+      mode: 'ingredients',
+      days: [],
+      totalItems: 0,
+      matchedItemsCount: 0,
+    };
+  }
 
-  const worksheet = workbook.worksheets[0];
-  if (!worksheet) {
+  if (!wb.SheetNames || wb.SheetNames.length === 0) {
     return {
       success: false,
       message: 'Không tìm thấy Sheet nào trong file Excel!',
@@ -146,28 +357,43 @@ export async function parseMenuExcel(buffer: Buffer): Promise<MenuImportResult> 
     };
   }
 
-  const rows: string[][] = [];
-  worksheet.eachRow({ includeEmpty: false }, (row) => {
-    const vals = row.values as unknown[];
-    if (Array.isArray(vals)) {
-      rows.push(
-        vals.slice(1).map((v) => (v !== null && v !== undefined ? String(v).trim() : ''))
-      );
-    }
-  });
+  // 1. Thử nhận diện theo format Báo cáo dinh dưỡng chuẩn trường mầm non (như diemchinh.xls, phanhieu.xls)
+  const schoolDays: ParsedDayMenu[] = [];
+  let totalSchoolItems = 0;
+  let matchedSchoolCount = 0;
 
-  if (rows.length === 0) {
+  for (const sName of wb.SheetNames) {
+    const ws = wb.Sheets[sName];
+    const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][];
+    const parsed = parseSchoolStandardSheet(data, sName);
+    if (parsed && parsed.items.length > 0) {
+      schoolDays.push(parsed);
+      totalSchoolItems += parsed.items.length;
+      matchedSchoolCount += parsed.items.filter((i) => i.matchedFood !== null).length;
+    }
+  }
+
+  if (schoolDays.length > 0) {
+    const maxStudents = Math.max(...schoolDays.map((d) => d.studentCount || 0));
+    const branchType = maxStudents >= 300 ? 'diemchinh' : 'phanhieu';
+
     return {
-      success: false,
-      message: 'File Excel không có dữ liệu!',
+      success: true,
+      message: `Đã phân tích thành công ${schoolDays.length} phân hệ (${schoolDays.map((d) => `${d.sheetName}: ${d.items.length} món`).join(', ')}). Khớp chuẩn ${matchedSchoolCount}/${totalSchoolItems} thực phẩm (${Math.round((matchedSchoolCount / totalSchoolItems) * 100)}%).`,
       mode: 'ingredients',
-      days: [],
-      totalItems: 0,
-      matchedItemsCount: 0,
+      days: schoolDays,
+      totalItems: totalSchoolItems,
+      matchedItemsCount: matchedSchoolCount,
+      branchDetected: branchType,
     };
   }
 
-  // 1. Kiểm tra header hàng để nhận diện cấu trúc
+  // 2. Fallback: Parse theo bảng dữ liệu cột chuẩn (Sheet đầu tiên)
+  const firstSheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = (XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as unknown[][]).map(
+    (row) => (Array.isArray(row) ? row.map((v) => (v !== null && v !== undefined ? String(v).trim() : '')) : [])
+  );
+
   let headerRowIdx = -1;
   let colSession = -1;
   let colName = -1;
@@ -196,7 +422,6 @@ export async function parseMenuExcel(buffer: Buffer): Promise<MenuImportResult> 
   const parsedItems: ParsedMenuItem[] = [];
   let matchedCount = 0;
 
-  // Nếu tìm thấy cột kiểu nguyên liệu chi tiết (Kiểu A)
   if (colName !== -1 && headerRowIdx !== -1) {
     for (let r = headerRowIdx + 1; r < rows.length; r++) {
       const row = rows[r];
@@ -244,15 +469,16 @@ export async function parseMenuExcel(buffer: Buffer): Promise<MenuImportResult> 
     };
   }
 
-  // Phương án B: Đọc danh sách món ăn từ các dòng
+  // 3. Fallback món ăn
   const dishDiscovered: ParsedMenuItem[] = [];
   for (let r = 0; r < rows.length; r++) {
     const row = rows[r];
     for (const cell of row) {
       if (!cell || cell.length < 3) continue;
-      // Tìm xem có khớp món trong SEED_DISH_ITEMS không
       const normCell = normalizeText(cell);
-      const matchedDish = SEED_DISH_ITEMS.find((d) => normalizeText(d.name).includes(normCell) || normCell.includes(normalizeText(d.name)));
+      const matchedDish = SEED_DISH_ITEMS.find(
+        (d) => normalizeText(d.name).includes(normCell) || normCell.includes(normalizeText(d.name))
+      );
       if (matchedDish) {
         matchedDish.ingredients.forEach((ing) => {
           const food = STANDARD_FOOD_CATALOG.find((f) => f.code === ing.foodCode || f.id === ing.foodId) || null;

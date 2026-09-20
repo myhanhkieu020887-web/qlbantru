@@ -655,33 +655,110 @@ export default function PMSDashboardPage() {
     showToast('Đã xóa món ăn khỏi thực đơn', 'info');
   };
 
-  // Nạp thực đơn phân tích từ file Excel vào thực đơn hiện tại
-  const handleApplyParsedMenu = (parsedDay: ParsedDayMenu) => {
+  // Nạp thực đơn phân tích từ file Excel vào thực đơn hiện tại (hỗ trợ đa phân hệ & đa điểm trường)
+  const handleApplyParsedMenu = (
+    parsedDay: ParsedDayMenu,
+    options?: {
+      targetBranch?: 'branch_1' | 'branch_2' | 'all';
+      studentCount?: number;
+      applyAllSheets?: boolean;
+      allDays?: ParsedDayMenu[];
+    }
+  ) => {
     if (currentPlan.status === 'LOCKED') {
       showToast('Thực đơn đang bị khóa, không thể nạp mới!', 'error');
       return;
     }
 
-    const newItems: MenuItem[] = parsedDay.items.map((pi, idx) => {
-      const matched = pi.matchedFood || STANDARD_FOOD_CATALOG[0];
-      return {
-        id: `excel_${Date.now()}_${idx}`,
-        foodId: matched.id,
-        food: matched,
-        mealSession: pi.mealSession,
-        gamPerChild: pi.gamPerChild > 0 ? pi.gamPerChild : 10,
-        dishName: pi.dishName || undefined,
-        isFixed: false,
-      };
-    });
+    const targetBranch = options?.targetBranch || 'all';
+    const applyAll = options?.applyAllSheets && options.allDays && options.allDays.length > 0;
+    const daysToApply = applyAll ? options!.allDays! : [parsedDay];
 
-    updateCurrentPlan((prev) => ({
-      ...prev,
-      items: newItems,
-      status: 'DRAFT',
-    }));
+    setSchedule((prevSchedule) =>
+      prevSchedule.map((bundle) => {
+        if (bundle.date !== selectedDate) return bundle;
 
-    showToast(`✓ Đã nạp ${newItems.length} thực phẩm từ Excel thành công!`, 'success');
+        let updatedMaugiao = bundle.maugiao;
+        let updatedAnsang = bundle.ansang;
+
+        daysToApply.forEach((d) => {
+          const newItems: MenuItem[] = d.items.map((pi, idx) => {
+            const matched = pi.matchedFood || STANDARD_FOOD_CATALOG[0];
+            return {
+              id: `excel_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+              foodId: matched.id,
+              food: matched,
+              mealSession: pi.mealSession,
+              gamPerChild: pi.gamPerChild > 0 ? pi.gamPerChild : 10,
+              dishName: pi.dishName || undefined,
+              isFixed: false,
+              customTotalBuy: pi.buyQuantity !== undefined && pi.buyQuantity > 0 ? pi.buyQuantity : undefined,
+            };
+          });
+
+          const count = d.studentCount || (d.targetGroup === 'ansang' ? 385 : 380);
+          const price = d.pricePerChild || (d.targetGroup === 'ansang' ? 7000 : 21000);
+
+          if (d.targetGroup === 'ansang' || d.sheetName?.toLowerCase().includes('sang')) {
+            updatedAnsang = {
+              ...updatedAnsang,
+              studentCount: count,
+              mealPricePerChild: price,
+              menuCode: d.menuTitle.sang || 'Ăn sáng dinh dưỡng',
+              items: newItems,
+              status: 'DRAFT',
+            };
+          } else {
+            updatedMaugiao = {
+              ...updatedMaugiao,
+              studentCount: count,
+              mealPricePerChild: price,
+              menuCode: d.menuTitle.trua || 'Thực đơn mầm non',
+              menuTitle: {
+                ...updatedMaugiao.menuTitle,
+                trua: d.menuTitle.trua || updatedMaugiao.menuTitle.trua,
+                xe: d.menuTitle.xe || updatedMaugiao.menuTitle.xe,
+                phu_xe: d.menuTitle.phu_xe || updatedMaugiao.menuTitle.phu_xe,
+              },
+              items: newItems,
+              status: 'DRAFT',
+            };
+          }
+        });
+
+        return {
+          ...bundle,
+          maugiao: updatedMaugiao,
+          ansang: updatedAnsang,
+        };
+      })
+    );
+
+    // Cập nhật cấu hình điểm trường tương ứng
+    if (targetBranch === 'branch_1') {
+      setSelectedBranchId('branch_1');
+      if (options?.studentCount && options.studentCount > 0) {
+        const parts = branchInput.split(';').map((s) => s.trim());
+        const otherCnt = parts[1] || '135';
+        setBranchInput(`${options.studentCount};${otherCnt}`);
+      }
+    } else if (targetBranch === 'branch_2') {
+      setSelectedBranchId('branch_2');
+      if (options?.studentCount && options.studentCount > 0) {
+        const parts = branchInput.split(';').map((s) => s.trim());
+        const mainCnt = parts[0] || '380';
+        setBranchInput(`${mainCnt};${options.studentCount}`);
+      }
+    }
+
+    const branchLabel =
+      targetBranch === 'branch_1' ? 'Cơ sở chính (Đ1)' : targetBranch === 'branch_2' ? 'Phân hiệu (Đ2)' : 'Toàn trường';
+
+    if (applyAll) {
+      showToast(`✓ Đã nạp đồng bộ cả Mẫu giáo và Ăn sáng từ Excel cho ${branchLabel}!`, 'success');
+    } else {
+      showToast(`✓ Đã nạp thành công ${parsedDay.items.length} thực phẩm phân hệ ${parsedDay.sheetName} (${branchLabel})!`, 'success');
+    }
   };
 
   // Xuất file Excel đi chợ phân bổ đa sheet theo điểm trường
