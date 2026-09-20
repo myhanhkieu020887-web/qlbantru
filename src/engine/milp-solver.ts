@@ -721,7 +721,7 @@ export async function solveIntegerBuyUnitsMenu(
       selectedBranchId
     ).totals;
 
-    const solverEngineName = isHighs ? 'HiGHS WASM' : 'TS Engine';
+    const solverEngineName = isHighs ? 'Python SciPy MILP' : 'TS Engine';
     const caloPass = finalTotals.isCaloPass ? 'Đạt' : 'Chưa đạt';
     const ratioPass = finalTotals.isRatioPass ? 'Cân đối' : 'Cần chỉnh';
     const diff = Math.round(finalTotals.budgetDifference);
@@ -811,7 +811,7 @@ export async function solveIntegerBuyUnitsMenu(
       'all'
     ).totals;
 
-    const solverEngineName = allUsedHighs ? 'HiGHS WASM' : 'TS Engine';
+    const solverEngineName = allUsedHighs ? 'Python SciPy MILP' : 'TS Engine';
     const caloPass = finalTotals.isCaloPass ? 'Đạt' : 'Chưa đạt';
     const ratioPass = finalTotals.isRatioPass ? 'Cân đối' : 'Cần chỉnh';
     const diff = Math.round(finalTotals.budgetDifference);
@@ -845,7 +845,7 @@ export async function solveIntegerBuyUnitsMenu(
     ageGroup
   ).totals;
 
-  const solverEngineName = isHighs ? 'HiGHS WASM' : 'TS Engine';
+  const solverEngineName = isHighs ? 'Python SciPy MILP' : 'TS Engine';
   const caloPass = finalTotals.isCaloPass ? 'Đạt' : 'Chưa đạt';
   const ratioPass = finalTotals.isRatioPass ? 'Cân đối' : 'Cần chỉnh';
   const diff = Math.round(finalTotals.budgetDifference);

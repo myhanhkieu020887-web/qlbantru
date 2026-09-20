@@ -6,10 +6,11 @@ import {
   ComputedMenuItem,
   NutritionTotals,
   MealCaloEvaluation,
+  SchoolBranch,
 } from '../../types/nutrition';
 import { evaluateMealCaloDistribution } from '../../engine/atwater';
 import { formatCurrency, formatNumber } from '../../lib/utils';
-import { RefreshCw, Info, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Sparkles, Scale } from 'lucide-react';
+import { RefreshCw, Info, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Sparkles, Scale, Download } from 'lucide-react';
 
 interface Props {
   computedItems: ComputedMenuItem[];
@@ -21,6 +22,9 @@ interface Props {
   isIntegerSolving?: boolean;
   onScaleNutrientGroup?: (category: 'protein' | 'carbs' | 'fat' | 'veg', percent: number) => void;
   selectedBranchId?: string;
+  branches?: SchoolBranch[];
+  onExportSingleBranchExcel?: (branchId: string) => void;
+  isExportingBranchExcel?: boolean;
 }
 
 export const NutritionMatrixFooter: React.FC<Props> = ({
@@ -33,6 +37,9 @@ export const NutritionMatrixFooter: React.FC<Props> = ({
   isIntegerSolving = false,
   onScaleNutrientGroup,
   selectedBranchId = 'all',
+  branches = [],
+  onExportSingleBranchExcel,
+  isExportingBranchExcel = false,
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [includeBreakfast, setIncludeBreakfast] = useState<boolean>(false);
@@ -243,14 +250,36 @@ export const NutritionMatrixFooter: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Bên phải: Nút Cân đối thực đơn & Co giãn nhanh */}
+        {/* Bên phải: Cụm Nút Cân đối thực đơn (F9), Xuất Đi Chợ & Co giãn nhanh */}
         <div className="flex items-center gap-2 relative">
+          {branches.length > 0 && onExportSingleBranchExcel && (
+            <div className="hidden xl:flex items-center gap-1 border-r border-slate-200 pr-2">
+              {branches.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => onExportSingleBranchExcel(b.id)}
+                  disabled={isExportingBranchExcel}
+                  className={`flex items-center gap-1 py-1 px-2 rounded text-[11px] font-bold transition disabled:opacity-50 cursor-pointer ${
+                    selectedBranchId === b.id
+                      ? 'bg-emerald-600 text-white shadow-2xs hover:bg-emerald-700'
+                      : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
+                  }`}
+                  title={`Xuất file Excel đi chợ độc lập cho ${b.name} (${b.code}) - Khớp đúng 0đ ngân sách`}
+                >
+                  <Download className="w-3 h-3 text-current" />
+                  <span>Đi chợ {b.code}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {onScaleNutrientGroup && (
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setIsScaleOpen(!isScaleOpen)}
-                className="flex items-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 py-1 px-2 rounded font-semibold text-[11px] shadow-2xs transition active:scale-95 cursor-pointer"
+                className="flex items-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 py-1.5 px-2 rounded-lg font-semibold text-[11px] shadow-2xs transition active:scale-95 cursor-pointer"
                 title="Mở bảng vi chỉnh co giãn định lượng nhanh % đạm, bột, rau, dầu"
               >
                 <Scale className="w-3 h-3 text-amber-600" />
@@ -260,33 +289,23 @@ export const NutritionMatrixFooter: React.FC<Props> = ({
             </div>
           )}
 
-          {onRunIntegerSolver && (
-            <button
-              type="button"
-              onClick={onRunIntegerSolver}
-              disabled={isIntegerSolving || isSolving}
-              className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white py-1 px-2.5 rounded font-bold text-[11px] shadow-xs transition active:scale-95 disabled:opacity-50 cursor-pointer"
-              title={`Cân đối độc lập bằng HiGHS WASM MILP cho ${
-                selectedBranchId === 'branch_1' ? 'Cơ sở chính (Đ1)' : selectedBranchId === 'branch_2' ? 'Phân hiệu (Đ2)' : 'Toàn trường'
-              }`}
-            >
-              <Sparkles className={`w-3 h-3 text-amber-300 ${isIntegerSolving ? 'animate-spin' : ''}`} />
-              <span>
-                {isIntegerSolving
-                  ? 'Đang giải HiGHS...'
-                  : `⚡ Cân đối ${selectedBranchId === 'branch_1' ? 'Đ1' : selectedBranchId === 'branch_2' ? 'Đ2' : 'Toàn trường'}`}
-              </span>
-            </button>
-          )}
-
+          {/* NÚT CAM NỔI BẬT: Cân đối thực đơn (F9) chuẩn media_1789902376462.png */}
           <button
             type="button"
-            onClick={onRunSolver}
+            onClick={onRunIntegerSolver || onRunSolver}
             disabled={isSolving || isIntegerSolving}
-            className="flex items-center gap-1 bg-[#f57c00] hover:bg-[#e65100] text-white py-1 px-2.5 rounded font-bold text-[11px] shadow-xs transition active:scale-95 disabled:opacity-50 cursor-pointer"
+            className="flex items-center justify-center gap-2 bg-[#f97316] hover:bg-[#ea580c] active:bg-[#c2410c] text-white px-3.5 py-1 rounded-lg font-bold shadow-sm transition active:scale-95 disabled:opacity-50 border border-[#ea580c]/30 cursor-pointer"
+            title={`Cân đối chuẩn xác bằng Python SciPy MILP cho ${
+              selectedBranchId === 'branch_1' ? 'Cơ sở chính (Đ1)' : selectedBranchId === 'branch_2' ? 'Phân hiệu (Đ2)' : 'Toàn trường (Đ1 & Đ2)'
+            } (Phím tắt: F9)`}
           >
-            <RefreshCw className={`w-3 h-3 ${isSolving ? 'animate-spin' : ''}`} />
-            <span>{isSolving ? 'Đang cân đối...' : 'Cân đối thực đơn (F9)'}</span>
+            <RefreshCw className={`w-4 h-4 shrink-0 ${isSolving || isIntegerSolving ? 'animate-spin' : ''}`} />
+            <div className="flex flex-col items-center leading-none py-0.5">
+              <span className="text-[11px] font-bold">
+                {isSolving || isIntegerSolving ? 'Đang cân đối...' : 'Cân đối thực đơn'}
+              </span>
+              <span className="text-[10px] font-bold opacity-90">(F9)</span>
+            </div>
           </button>
         </div>
       </div>
@@ -348,15 +367,43 @@ export const NutritionMatrixFooter: React.FC<Props> = ({
 
           {/* CỤM NÚT CÂN ĐỐI THỰC ĐƠN & CO GIÃN NHANH */}
           <div className="space-y-1.5 relative">
+            {/* NÚT CAM NỔI BẬT: Cân đối thực đơn (F9) chuẩn media_1789902376462.png */}
             <button
               type="button"
-              onClick={onRunSolver}
-              disabled={isSolving}
-              className="w-full flex items-center justify-center gap-1.5 bg-[#f57c00] hover:bg-[#e65100] text-white py-1.5 px-3 rounded-lg font-bold text-xs shadow transition active:scale-95 disabled:opacity-50"
+              onClick={onRunIntegerSolver || onRunSolver}
+              disabled={isSolving || isIntegerSolving}
+              className="w-full flex items-center justify-center gap-2.5 bg-[#f97316] hover:bg-[#ea580c] active:bg-[#c2410c] text-white py-2 px-3 rounded-lg font-bold shadow transition active:scale-95 disabled:opacity-50 border border-[#ea580c]/30 cursor-pointer"
+              title={`Cân đối chuẩn xác bằng Python SciPy MILP cho ${
+                selectedBranchId === 'branch_1' ? 'Cơ sở chính (Đ1)' : selectedBranchId === 'branch_2' ? 'Phân hiệu (Đ2)' : 'Toàn trường (Đ1 & Đ2)'
+              } (Phím tắt: F9)`}
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSolving ? 'animate-spin' : ''}`} />
-              <span>{isSolving ? 'Đang cân đối...' : 'Cân đối thực đơn'}</span>
+              <RefreshCw className={`w-4 h-4 shrink-0 ${isSolving || isIntegerSolving ? 'animate-spin' : ''}`} />
+              <div className="flex flex-col items-center leading-tight">
+                <span className="text-xs font-bold">
+                  {isSolving || isIntegerSolving ? 'Đang cân đối...' : 'Cân đối thực đơn'}
+                </span>
+                <span className="text-[11px] font-bold opacity-90">(F9)</span>
+              </div>
             </button>
+
+            {/* Các nút xuất file đi chợ độc lập cho từng điểm trường */}
+            {branches.length > 0 && onExportSingleBranchExcel && (
+              <div className="flex items-center gap-1.5 pt-0.5">
+                {branches.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => onExportSingleBranchExcel(b.id)}
+                    disabled={isExportingBranchExcel}
+                    className="flex-1 flex items-center justify-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 py-1 px-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+                    title={`Xuất file Excel đi chợ độc lập cho ${b.name} (${b.code}) - Khớp đúng 0đ ngân sách`}
+                  >
+                    <Download className="w-3 h-3 text-emerald-600" />
+                    <span>Đi chợ {b.code}</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {onScaleNutrientGroup && (
               <div className="relative">

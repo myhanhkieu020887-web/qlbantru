@@ -35,3 +35,6 @@ pnpm-debug.log*
 
 # generated test files
 test_export.xlsx
+__pycache__/
+*.pyc
+python/output/

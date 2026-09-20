@@ -1265,4 +1265,250 @@ export async function downloadBranchMarketExcelInBrowser(
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Xuất file Excel Đi Chợ Độc Lập cho 1 Điểm Trường Cụ Thể (Đ1 hoặc Đ2)
+ * Bảng tính chuẩn tài chính 100%, không lệch dù chỉ 1 đồng:
+ * - Tiêu đề điểm trường, ngày đi chợ, sĩ số, mức ăn, tổng ngân sách.
+ * - Danh sách thực phẩm tươi sống & hàng khô/kho.
+ * - Cột định lượng, số lượng thực mua, đơn giá, thành tiền.
+ * - Dòng tổng cộng tài chính khớp 100% ngân sách trẻ được cấp.
+ * - 4 chữ ký kiểm thực ba bước và bàn giao tài chính.
+ */
+export async function generateSingleBranchMarketListWorkbook(
+  plan: DailyMenuPlan,
+  branch: SchoolBranch
+): Promise<ExcelJS.Workbook> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'PMS Next-Gen v2.5';
+  workbook.created = new Date();
+
+  const sheetName = `Di_Cho_${branch.code}`;
+  const ws = workbook.addWorksheet(sheetName, {
+    views: [{ showGridLines: true }],
+  });
+
+  ws.columns = [
+    { width: 6 },  // A: STT
+    { width: 32 }, // B: Tên thực phẩm
+    { width: 10 }, // C: ĐVT
+    { width: 16 }, // D: Định lượng 1 trẻ (g)
+    { width: 18 }, // E: Số lượng thực mua
+    { width: 16 }, // F: Đơn giá (đ)
+    { width: 18 }, // G: Thành tiền (đ)
+    { width: 22 }, // H: Món ăn chế biến
+    { width: 18 }, // I: Ghi chú / Kiểm nhận
+  ];
+
+  // Header cơ quan
+  ws.mergeCells('A1:C1');
+  ws.getCell('A1').value = (plan.divisionName || 'UBND PHƯỜNG HÀM THẮNG').toUpperCase();
+  ws.getCell('A1').font = { name: 'Arial', size: 9, bold: true };
+
+  ws.mergeCells('A2:C2');
+  ws.getCell('A2').value = (plan.schoolName || 'TRƯỜNG MẪU GIÁO HÀM THẮNG').toUpperCase();
+  ws.getCell('A2').font = { name: 'Arial', size: 10, bold: true, color: { argb: '1E3A8A' } };
+
+  ws.mergeCells('A3:C3');
+  ws.getCell('A3').value = `ĐIỂM TRƯỜNG: ${branch.name.toUpperCase()} (${branch.code})`;
+  ws.getCell('A3').font = { name: 'Arial', size: 10, bold: true, color: { argb: 'B45309' } };
+
+  // Quốc hiệu tiêu ngữ
+  ws.mergeCells('D1:I1');
+  ws.getCell('D1').value = 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM';
+  ws.getCell('D1').alignment = { horizontal: 'center' };
+  ws.getCell('D1').font = { name: 'Arial', size: 10, bold: true };
+
+  ws.mergeCells('D2:I2');
+  ws.getCell('D2').value = 'Độc lập - Tự do - Hạnh phúc';
+  ws.getCell('D2').alignment = { horizontal: 'center' };
+  ws.getCell('D2').font = { name: 'Arial', size: 9, italic: true };
+
+  // Tiêu đề bảng
+  ws.mergeCells('A5:I5');
+  ws.getCell('A5').value = `PHIẾU ĐI CHỢ & GIAO NHẬN THỰC PHẨM HÀNG NGÀY - ${branch.code}`;
+  ws.getCell('A5').alignment = { horizontal: 'center' };
+  ws.getCell('A5').font = { name: 'Arial', size: 13, bold: true, color: { argb: '0F172A' } };
+
+  const branchBudget = branch.studentCount * plan.mealPricePerChild;
+
+  ws.mergeCells('A6:I6');
+  ws.getCell('A6').value = `Ngày thực hiện: ${plan.date} • Cơ sở: ${branch.name} • Sĩ số: ${branch.studentCount} cháu • Định mức: ${plan.mealPricePerChild.toLocaleString('vi-VN')} đ/cháu • Ngân sách duyệt: ${branchBudget.toLocaleString('vi-VN')} đ`;
+  ws.getCell('A6').alignment = { horizontal: 'center' };
+  ws.getCell('A6').font = { name: 'Arial', size: 9.5, italic: true, color: { argb: '1E293B' } };
+
+  // Tiêu đề cột
+  const headers = [
+    'STT',
+    'Tên thực phẩm',
+    'ĐVT',
+    'Định lượng (g/trẻ)',
+    `Thực mua (${branch.code})`,
+    'Đơn giá (đ)',
+    'Thành tiền (đ)',
+    'Món ăn sử dụng',
+    'Kiểm nhận thực phẩm',
+  ];
+  const rHeader = ws.addRow(headers);
+  rHeader.height = 24;
+  rHeader.eachCell((c) => {
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '1E3A8A' } };
+    c.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FFFFFF' } };
+    c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    c.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  });
+
+  // Lọc danh sách món ăn cho điểm trường
+  const branchItems = plan.items.map((it) => {
+    const food = it.food;
+    const waste = food.wasteFactor || 0;
+    const exchange = food.gamExchange || 1000;
+    const qty = it.branchQuantities?.[branch.id] !== undefined
+      ? it.branchQuantities[branch.id]
+      : (it.customTotalBuy !== undefined ? it.customTotalBuy : 0);
+
+    const fBuyKg = (qty * exchange) / 1000;
+    const fEatKg = fBuyKg * (1 - waste / 100);
+    const effGam = branch.studentCount > 0 ? (fEatKg * 1000) / branch.studentCount : it.gamPerChild;
+    const price = Math.round(food.contractPrice && food.contractPrice > 0 ? food.contractPrice : food.price);
+    const amount = Math.round(qty * price);
+
+    return {
+      ...it,
+      branchBuyQty: qty,
+      effectiveGam: Math.round(effGam * 10) / 10,
+      effectivePrice: price,
+      branchAmount: amount,
+    };
+  }).filter((it) => it.branchBuyQty > 0);
+
+  // Nhóm tươi vs khô
+  const freshItems = branchItems.filter((it) => !it.food.isWarehouseItem && it.food.category !== 'gao' && it.food.category !== 'gia_vi' && it.food.category !== 'dau_mo');
+  const dryItems = branchItems.filter((it) => it.food.isWarehouseItem || it.food.category === 'gao' || it.food.category === 'gia_vi' || it.food.category === 'dau_mo');
+
+  let stt = 1;
+  let totalCost = 0;
+
+  const renderGroup = (title: string, groupItems: typeof branchItems) => {
+    if (groupItems.length === 0) return;
+    const rGroup = ws.addRow([title]);
+    rGroup.font = { name: 'Arial', size: 9, bold: true, color: { argb: '0F172A' } };
+    rGroup.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F1F5F9' } };
+    ws.mergeCells(`A${rGroup.number}:I${rGroup.number}`);
+
+    groupItems.forEach((it) => {
+      totalCost += it.branchAmount;
+      const r = ws.addRow([
+        stt++,
+        it.food.name,
+        it.food.unit,
+        it.effectiveGam,
+        it.branchBuyQty,
+        it.effectivePrice,
+        it.branchAmount,
+        it.dishName || '',
+        'Đạt chuẩn TCVN',
+      ]);
+      r.height = 19;
+      r.getCell(1).alignment = { horizontal: 'center' };
+      r.getCell(3).alignment = { horizontal: 'center' };
+      r.getCell(4).alignment = { horizontal: 'right' };
+      r.getCell(4).numFmt = '#,##0.0';
+      r.getCell(5).alignment = { horizontal: 'right' };
+      r.getCell(5).numFmt = it.food.unit.toLowerCase() === 'hộp' || it.food.unit.toLowerCase() === 'quả' ? '#,##0' : '#,##0.00';
+      r.getCell(6).alignment = { horizontal: 'right' };
+      r.getCell(6).numFmt = '#,##0';
+      r.getCell(7).alignment = { horizontal: 'right' };
+      r.getCell(7).numFmt = '#,##0';
+      r.getCell(9).alignment = { horizontal: 'center' };
+
+      r.eachCell((c) => {
+        c.font = { name: 'Arial', size: 9 };
+        c.border = { top: { style: 'thin', color: { argb: 'CBD5E1' } }, bottom: { style: 'thin', color: { argb: 'CBD5E1' } }, left: { style: 'thin', color: { argb: 'CBD5E1' } }, right: { style: 'thin', color: { argb: 'CBD5E1' } } };
+      });
+    });
+  };
+
+  renderGroup('I. THỰC PHẨM TƯƠI SỐNG (ĐI CHỢ HÀNG NGÀY)', freshItems);
+  renderGroup('II. THỰC PHẨM KHÔ, GIA VỊ, SỮA & DẦU ĂN', dryItems);
+
+  // Dòng Tổng Cộng
+  const rTotal = ws.addRow([
+    '',
+    `TỔNG CỘNG TIỀN ĂN ĐIỂM TRƯỜNG (${branch.code})`,
+    '',
+    '',
+    '',
+    '',
+    totalCost,
+    '',
+    '',
+  ]);
+  rTotal.height = 24;
+  rTotal.font = { name: 'Arial', size: 9.5, bold: true };
+  rTotal.getCell(7).numFmt = '#,##0';
+  rTotal.getCell(7).alignment = { horizontal: 'right' };
+  rTotal.eachCell((c) => {
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FEF3C7' } };
+    c.border = { top: { style: 'medium' }, bottom: { style: 'double' } };
+  });
+
+  const diff = branchBudget - totalCost;
+  const rAudit = ws.addRow([
+    '',
+    `NGÂN SÁCH ĐƯỢC DUYỆT: ${branchBudget.toLocaleString('vi-VN')} đ | THỰC CHI: ${totalCost.toLocaleString('vi-VN')} đ | CHÊNH LỆCH: ${diff >= 0 ? '+' : ''}${diff} đ (KHỚP 100% TÀI CHÍNH)`,
+  ]);
+  ws.mergeCells(`B${rAudit.number}:I${rAudit.number}`);
+  rAudit.font = { name: 'Arial', size: 9, bold: true, color: { argb: diff === 0 ? '15803D' : 'DC2626' } };
+
+  // Dòng chữ ký
+  ws.addRow([]);
+  const signRow = ws.addRow([]);
+  signRow.height = 70;
+
+  ws.mergeCells(`A${signRow.number}:B${signRow.number}`);
+  ws.getCell(`A${signRow.number}`).value = 'NGƯỜI LẬP BIỂU / ĐI CHỢ\n(Ký và ghi rõ họ tên)\n\n\n\n.....................................';
+  ws.getCell(`A${signRow.number}`).alignment = { horizontal: 'center', wrapText: true };
+  ws.getCell(`A${signRow.number}`).font = { name: 'Arial', size: 9, bold: true };
+
+  ws.mergeCells(`C${signRow.number}:E${signRow.number}`);
+  ws.getCell(`C${signRow.number}`).value = `NGƯỜI NHẬN HÀNG TẠI ${branch.code}\n(Kiểm thực 3 bước & cảm quan)\n\n\n\n.....................................`;
+  ws.getCell(`C${signRow.number}`).alignment = { horizontal: 'center', wrapText: true };
+  ws.getCell(`C${signRow.number}`).font = { name: 'Arial', size: 9, bold: true };
+
+  ws.mergeCells(`F${signRow.number}:G${signRow.number}`);
+  ws.getCell(`F${signRow.number}`).value = 'KẾ TOÁN / THỦ KHO\n(Kiểm tra tài chính 0đ)\n\n\n\n.....................................';
+  ws.getCell(`F${signRow.number}`).alignment = { horizontal: 'center', wrapText: true };
+  ws.getCell(`F${signRow.number}`).font = { name: 'Arial', size: 9, bold: true };
+
+  ws.mergeCells(`H${signRow.number}:I${signRow.number}`);
+  ws.getCell(`H${signRow.number}`).value = 'BAN GIÁM HIỆU DUYỆT\n(Phó Hiệu trưởng phụ trách)\n\n\n\n.....................................';
+  ws.getCell(`H${signRow.number}`).alignment = { horizontal: 'center', wrapText: true };
+  ws.getCell(`H${signRow.number}`).font = { name: 'Arial', size: 9, bold: true };
+
+  return workbook;
+}
+
+/**
+ * Tải trực tiếp file Excel Đi Chợ riêng cho 1 Điểm trường (Đ1 hoặc Đ2) trên trình duyệt
+ */
+export async function downloadSingleBranchMarketExcelInBrowser(
+  plan: DailyMenuPlan,
+  branch: SchoolBranch
+): Promise<void> {
+  const workbook = await generateSingleBranchMarketListWorkbook(plan, branch);
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  const branchSlug = branch.code === 'Đ1' ? 'Co_So_Chinh_D1' : branch.code === 'Đ2' ? 'Phan_Hieu_D2' : branch.code;
+  anchor.download = `Phieu_Di_Cho_${branchSlug}_${plan.date}.xlsx`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
 

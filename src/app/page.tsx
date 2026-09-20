@@ -88,7 +88,7 @@ import { SolverOptions } from '../engine/milp-solver';
 import { AiMenuSuggestionResult } from '../lib/services/AiMenuService';
 import { ParsedDayMenu } from '../lib/excel/menu-importer';
 import { createBlankWeeklySchedule } from '../data/seed-weekly-schedule';
-import { downloadBranchMarketExcelInBrowser } from '../lib/excel/exporter';
+import { downloadBranchMarketExcelInBrowser, downloadSingleBranchMarketExcelInBrowser } from '../lib/excel/exporter';
 
 // Supplier & Invoices (Quy trình công nợ 3 bước & Multi-campus)
 import { SupplierListView } from '../components/views/SupplierListView';
@@ -433,22 +433,7 @@ export default function PMSDashboardPage() {
     showToast(`✨ Đã áp dụng gợi ý AI: ${suggestion.title}`, 'success');
   };
 
-  // Phím tắt bàn phím Desktop F9, Ctrl+E, Ctrl+P
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F9') {
-        e.preventDefault();
-        handleRunSolver();
-      } else if (e.ctrlKey && e.key.toLowerCase() === 'e') {
-        e.preventDefault();
-        handleExportExcel();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleRunSolver]);
-
-  // Chạy Bộ giải tối ưu số lượng thực mua ĐVT số nguyên (Integer MILP Solver với HiGHS WASM)
+  // Chạy Bộ giải tối ưu số lượng thực mua ĐVT số nguyên (Integer MILP Solver với Python SciPy / HiGHS WASM)
   const handleRunIntegerSolver = useCallback(async (customOptions?: SolverOptions) => {
     if (currentPlan.status === 'LOCKED') {
       showToast('Thực đơn đã khóa sổ! Không thể cân đối lại.', 'error');
@@ -488,6 +473,21 @@ export default function PMSDashboardPage() {
       showToast(err instanceof Error ? err.message : 'Lỗi khi chạy bộ giải tối ưu', 'error');
     }
   }, [currentPlan, updateCurrentPlan, triggerCloudSync, solverConfig, branches, selectedBranchId]);
+
+  // Phím tắt bàn phím Desktop F9 (Cân đối MILP theo ngữ cảnh điểm trường), Ctrl+E, Ctrl+P
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F9') {
+        e.preventDefault();
+        handleRunIntegerSolver();
+      } else if (e.ctrlKey && e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        handleExportExcel();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleRunIntegerSolver]);
 
   // Nhập trực tiếp ô Tổng thực mua ĐVT: suy ngược ra gam/trẻ và phân bổ điểm trường bảo toàn
   const handleUpdateTotalBuyUnit = (itemId: string, newBuyUnit: number) => {
@@ -854,6 +854,25 @@ export default function PMSDashboardPage() {
     } catch (err) {
       console.error(err);
       showToast('Lỗi khi xuất file Excel đi chợ', 'error');
+    } finally {
+      setIsExportingBranchExcel(false);
+    }
+  };
+
+  // Xuất file Excel đi chợ độc lập cho từng điểm trường riêng lẻ
+  const handleExportSingleBranchMarketExcel = async (branchId: string) => {
+    const targetBranch = branches.find((b) => b.id === branchId);
+    if (!targetBranch) {
+      showToast('Không tìm thấy thông tin điểm trường', 'error');
+      return;
+    }
+    setIsExportingBranchExcel(true);
+    try {
+      await downloadSingleBranchMarketExcelInBrowser(currentPlan, targetBranch);
+      showToast(`✓ Đã xuất Phiếu đi chợ cho ${targetBranch.name} (${targetBranch.code}) thành công!`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Lỗi khi xuất file Excel đi chợ điểm trường', 'error');
     } finally {
       setIsExportingBranchExcel(false);
     }
@@ -1784,6 +1803,7 @@ export default function PMSDashboardPage() {
                 onOpenExcelImport={() => setIsExcelImportOpen(true)}
                 onExportBranchExcel={handleExportBranchMarketExcel}
                 isExportingBranchExcel={isExportingBranchExcel}
+                onExportSingleBranchExcel={handleExportSingleBranchMarketExcel}
                 onResetBlankMenu={handleResetBlankMenu}
                 isLocked={isLocked}
                 canEditNutrients={rolePerm.canEditNutrients}
@@ -1837,6 +1857,9 @@ export default function PMSDashboardPage() {
                 isIntegerSolving={isIntegerSolving}
                 onScaleNutrientGroup={handleScaleNutrientGroup}
                 selectedBranchId={selectedBranchId}
+                branches={branches}
+                onExportSingleBranchExcel={handleExportSingleBranchMarketExcel}
+                isExportingBranchExcel={isExportingBranchExcel}
               />
             </main>
           </>
@@ -2009,7 +2032,7 @@ export default function PMSDashboardPage() {
         }}
         onRunSolver={() => {
           setIsWorkflowGuideOpen(false);
-          handleRunSolver();
+          handleRunIntegerSolver();
         }}
         onExportBranchExcel={() => {
           setIsWorkflowGuideOpen(false);

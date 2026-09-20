@@ -62,6 +62,7 @@ interface Props {
   onOpenExcelImport?: () => void;
   onExportBranchExcel?: () => void;
   isExportingBranchExcel?: boolean;
+  onExportSingleBranchExcel?: (branchId: string) => void;
   onResetBlankMenu?: () => void;
   isLocked?: boolean;
   canEditNutrients?: boolean;
@@ -105,6 +106,7 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
   onOpenExcelImport,
   onExportBranchExcel,
   isExportingBranchExcel = false,
+  onExportSingleBranchExcel,
   onResetBlankMenu,
   isLocked = false,
   canEditNutrients = true,
@@ -334,6 +336,24 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
                 <span className="hidden md:inline">Đi chợ điểm trường</span>
               </button>
             )}
+
+            {onExportSingleBranchExcel && branches.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => onExportSingleBranchExcel(b.id)}
+                disabled={isExportingBranchExcel}
+                className={`flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded transition disabled:opacity-50 cursor-pointer ${
+                  selectedBranchId === b.id
+                    ? 'bg-teal-700 text-white shadow-xs hover:bg-teal-800'
+                    : 'text-teal-800 hover:text-teal-950 hover:bg-white'
+                }`}
+                title={`Xuất file Excel đi chợ độc lập cho ${b.name} (${b.code}) - Khớp đúng 0đ ngân sách`}
+              >
+                <Download className="w-3 h-3 text-current" />
+                <span className="hidden sm:inline">Đi chợ {b.code}</span>
+              </button>
+            ))}
 
             {onResetBlankMenu && (
               <button
