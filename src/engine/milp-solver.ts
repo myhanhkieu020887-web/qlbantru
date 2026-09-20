@@ -1,6 +1,15 @@
 import { AgeGroup, MenuItem, SchoolBranch } from '../types/nutrition';
 import { computeNutritionTotals } from './atwater';
 
+export interface RoundingConfig {
+  milkStep?: number;       // Sữa (Hộp/Gói): mặc định 1
+  eggStep?: number;        // Trứng (Quả): mặc định 1
+  oilStep?: number;        // Dầu ăn (Lít/Chai): mặc định 0.5 (hoặc 1)
+  fishSauceStep?: number;  // Nước mắm (Lít/Chai): mặc định 0.1 (hoặc 1)
+  seasoningStep?: number;  // Gia vị nấu (Kg): mặc định 0.1
+  otherStep?: number;      // Thịt, cá, rau, củ, gạo, bún...: mặc định 0.01 (số lẻ tự nhiên)
+}
+
 export interface SolverOptions {
   targetBudgetPerChild?: number;
   targetCalo?: number;
@@ -15,6 +24,7 @@ export interface SolverOptions {
   minScaleFactor?: number;  // Giới hạn giảm tối thiểu (0.3 - 0.8, default: 0.5)
   maxScaleFactor?: number;  // Giới hạn tăng tối đa (1.2 - 2.2, default: 1.6)
   forceIntegerBuyUnits?: boolean; // Ép số lượng thực mua ĐVT về số nguyên chuẩn
+  roundingConfig?: RoundingConfig; // Cấu hình bước làm tròn linh hoạt theo nhóm thực phẩm
 }
 
 export interface SolverResult {
@@ -229,13 +239,61 @@ export function solveNutritionMenu(
 }
 
 /**
- * Thuật toán Cân đối Số Lượng Thực Mua ĐVT Số Nguyên (Integer Buy Units MILP Solver)
+ * Xác định bước làm tròn ĐVT cho từng loại thực phẩm dựa theo cấu hình
+ */
+export function getFoodRoundingStep(food: { name?: string; unit?: string; category?: string }, config?: RoundingConfig): number {
+  const normName = (food.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd');
+  const normUnit = (food.unit || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd');
+  const cat = food.category || '';
+
+  // 1. Nhóm Sữa (Hộp, Gói, Vỉ...)
+  if (
+    normName.includes('sua') ||
+    normName.includes('smarta') ||
+    normName.includes('metacare') ||
+    cat === 'sua_banh' ||
+    normUnit.includes('hop') ||
+    normUnit.includes('goi') ||
+    normUnit.includes('vi')
+  ) {
+    return config?.milkStep ?? 1;
+  }
+
+  // 2. Nhóm Trứng (Quả, Trứng cút, Trứng gà...)
+  if (normName.includes('trung') || normUnit.includes('qua')) {
+    return config?.eggStep ?? 1;
+  }
+
+  // 3. Nhóm Dầu ăn
+  if (normName.includes('dau an') || normName.includes('dau meizan') || cat === 'dau_mo') {
+    if (normUnit.includes('chai')) return config?.oilStep ?? 1;
+    return config?.oilStep ?? 0.5;
+  }
+
+  // 4. Nhóm Nước mắm
+  if (normName.includes('nuoc mam') || normName.includes('nam ngu')) {
+    if (normUnit.includes('chai')) return config?.fishSauceStep ?? 1;
+    return config?.fishSauceStep ?? 0.1;
+  }
+
+  // 5. Nhóm Gia vị nấu (Đường, Muối, Tiêu, Hạt nêm, Hành củ, Tỏi, Gừng...)
+  if (cat === 'gia_vi' || normName.includes('duong') || normName.includes('muoi') || normName.includes('tieu') || normName.includes('toi') || normName.includes('gung') || normName.includes('hanh cu')) {
+    return config?.seasoningStep ?? 0.1;
+  }
+
+  // 6. Tất cả thực phẩm còn lại (Thịt, cá, tôm, rau, củ, quả, gạo, bún...): để lẻ tự nhiên (bước 0.01)
+  return config?.otherStep ?? 0.01;
+}
+
+/**
+ * Thuật toán Cân đối Số Lượng Thực Mua ĐVT Linh Hoạt (Flexible Buy Units MILP Solver)
  * Đảm bảo 100%:
- * 1. Tổng thực mua ĐVT là số nguyên tròn trịa khi đi chợ (hoặc số thập phân 1 chữ số với gia vị).
- * 2. Phân bổ bảo toàn số nguyên cho từng điểm trường (Đ1, Đ2) theo phương pháp Hare-Niemeyer.
- * 3. Đồng bộ 2 chiều suy ngược ra định lượng thực ăn gam/trẻ:
+ * 1. Làm tròn số nguyên/bước chuẩn cho: Sữa (hộp: 1), Trứng (quả: 1), Dầu ăn (0.5/1), Nước mắm (0.1/1), Gia vị (0.1).
+ * 2. Giữ số lẻ tự nhiên (0.01 kg) cho các mặt hàng còn lại: Thịt, cá, tôm, rau, củ, quả, gạo, bún.
+ * 3. Phân bổ bảo toàn tổng mua cho từng điểm trường (Đ1, Đ2) theo tỷ lệ học sinh.
+ * 4. Đồng bộ 2 chiều suy ngược ra định lượng thực ăn gam/trẻ:
  *    gam/trẻ = (Thực mua ĐVT * gamExchange / 1000) * (1 - waste/100) * 1000 / N
- * 4. Đánh giá Lượng: Đạt (615 - 738 Kcal), Đánh giá Chất: Cân đối (P: 13-20%, L: 25-35%, G: 52-60%).
+ * 5. Đánh giá Lượng: Đạt (615 - 738 Kcal), Đánh giá Chất: Cân đối (P: 13-20%, L: 25-35%, G: 52-60%).
  */
 export function solveIntegerBuyUnitsMenu(
   items: MenuItem[],
@@ -246,8 +304,9 @@ export function solveIntegerBuyUnitsMenu(
 ): SolverResult {
   const startTime = performance.now();
   const targetBudget = options.targetBudgetPerChild || 21000;
+  const roundingCfg = options.roundingConfig;
 
-  // 1. Chạy Continuous MILP Solver trước để lấy dải định lượng tối ưu nền
+  // 1. Chạy Continuous MILP Solver trước để lấy dải định lượng tối ưu nền (đạt chuẩn Lượng & Chất)
   const baseRes = solveNutritionMenu(items, studentCount, ageGroup, {
     ...options,
     targetBudgetPerChild: targetBudget,
@@ -263,124 +322,148 @@ export function solveIntegerBuyUnitsMenu(
     ? branches.reduce((sum, b) => sum + b.studentCount, 0)
     : studentCount;
 
-  // 2. Chuyển đổi định lượng gam thành số nguyên thực mua ĐVT cho từng món
+  // 2. Chuyển đổi định lượng gam thành Thực Mua ĐVT theo quy tắc làm tròn linh hoạt
   optimizedItems.forEach((it) => {
     const food = it.food;
     const waste = food.wasteFactor || 0;
     const exchange = food.gamExchange || 1000;
-    const cat = food.category;
-
-    // Gia vị hoặc dầu ăn nhỏ nếu cần số thập phân 1 chữ số
-    const isSeasoning = cat === 'gia_vi';
 
     // Khối lượng ăn cả trường (kg)
     const eatKg = (it.gamPerChild * totalStudents) / 1000;
     // Nhu cầu mua cả trường (kg)
     const buyKg = waste < 100 ? eatKg / (1 - waste / 100) : eatKg;
-    // Quy đổi ra ĐVT
+    // Quy đổi ra ĐVT thô
     const rawBuyUnit = (buyKg * 1000) / exchange;
 
-    let targetIntegerBuyUnit: number;
-    if (isSeasoning && rawBuyUnit < 5) {
-      // Gia vị nhỏ: làm tròn 1 chữ số thập phân
-      targetIntegerBuyUnit = Math.max(0.1, Math.round(rawBuyUnit * 10) / 10);
+    // Lấy bước làm tròn cho thực phẩm này
+    const step = getFoodRoundingStep(food, roundingCfg);
+
+    let targetBuyUnit: number;
+    if (step >= 1) {
+      // Nhóm làm tròn số nguyên (Sữa, Trứng, hoặc Chai dầu 1L)
+      targetBuyUnit = Math.max(step, Math.round(rawBuyUnit / step) * step);
+    } else if (step === 0.5) {
+      // Dầu ăn lít (0.5 hoặc nguyên)
+      targetBuyUnit = Math.max(0.5, Math.round(rawBuyUnit * 2) / 2);
+    } else if (step === 0.1) {
+      // Gia vị nấu, nước mắm: làm tròn 1 chữ số thập phân
+      targetBuyUnit = Math.max(0.1, Math.round(rawBuyUnit * 10) / 10);
     } else {
-      // Thực phẩm tươi sống, củ quả, trứng: luôn là số nguyên >= 1
-      targetIntegerBuyUnit = Math.max(1, Math.round(rawBuyUnit));
+      // Các thực phẩm còn lại (thịt, cá, rau, củ, quả, gạo, bún...): để số lẻ tự nhiên 2 chữ số thập phân
+      targetBuyUnit = Math.max(0.01, Math.round(rawBuyUnit * 100) / 100);
     }
 
-    // 3. Phân bổ số nguyên cho các điểm trường (Hare-Niemeyer)
+    // 3. Phân bổ cho các điểm trường (bảo toàn tổng mua)
     const branchQtys: Record<string, number> = {};
     if (branches.length > 0) {
-      const intTotal = Math.round(targetIntegerBuyUnit);
-      let allocatedSum = 0;
-      const quotas = branches.map((b) => {
-        const q = (intTotal * b.studentCount) / totalStudents;
-        const floor = Math.floor(q);
-        allocatedSum += floor;
-        return {
-          id: b.id,
-          floor,
-          fraction: q - floor,
-        };
-      });
+      if (step >= 1) {
+        // Nhóm số nguyên (Sữa, Trứng): dùng thuật toán Hare-Niemeyer phân bổ số nguyên 100%
+        const intTotal = Math.round(targetBuyUnit);
+        let allocatedSum = 0;
+        const quotas = branches.map((b) => {
+          const q = (intTotal * b.studentCount) / totalStudents;
+          const floor = Math.floor(q);
+          allocatedSum += floor;
+          return { id: b.id, floor, fraction: q - floor };
+        });
 
-      let remainder = intTotal - allocatedSum;
-      quotas.sort((a, b) => b.fraction - a.fraction);
-      quotas.forEach((q) => {
-        const add = remainder > 0 ? 1 : 0;
-        if (remainder > 0) remainder--;
-        branchQtys[q.id] = q.floor + add;
-      });
-
-      targetIntegerBuyUnit = intTotal;
+        let remainder = intTotal - allocatedSum;
+        quotas.sort((a, b) => b.fraction - a.fraction);
+        quotas.forEach((q) => {
+          const add = remainder > 0 ? 1 : 0;
+          if (remainder > 0) remainder--;
+          branchQtys[q.id] = q.floor + add;
+        });
+        targetBuyUnit = intTotal;
+      } else if (step === 0.5 || step === 0.1) {
+        // Nhóm gia vị, dầu ăn: phân bổ 1 chữ số thập phân
+        let sumB = 0;
+        branches.forEach((b, idx) => {
+          if (idx === branches.length - 1) {
+            // Điểm cuối bù trừ phần còn lại để bảo toàn đúng targetBuyUnit
+            branchQtys[b.id] = Math.max(0, Math.round((targetBuyUnit - sumB) * 10) / 10);
+          } else {
+            const rawB = (targetBuyUnit * b.studentCount) / totalStudents;
+            const bVal = Math.round(rawB * 10) / 10;
+            branchQtys[b.id] = bVal;
+            sumB += bVal;
+          }
+        });
+      } else {
+        // Nhóm thịt, cá, rau, gạo...: phân bổ lẻ 2 chữ số thập phân bảo toàn tổng mua
+        let sumB = 0;
+        branches.forEach((b, idx) => {
+          if (idx === branches.length - 1) {
+            branchQtys[b.id] = Math.max(0, Math.round((targetBuyUnit - sumB) * 100) / 100);
+          } else {
+            const rawB = (targetBuyUnit * b.studentCount) / totalStudents;
+            const bVal = Math.round(rawB * 100) / 100;
+            branchQtys[b.id] = bVal;
+            sumB += bVal;
+          }
+        });
+      }
     }
 
     // 4. Suy ngược lại gam/trẻ bảo toàn chính xác từ Thực Mua ĐVT
-    const finalBuyKg = (targetIntegerBuyUnit * exchange) / 1000;
+    const finalBuyKg = (targetBuyUnit * exchange) / 1000;
     const finalEatKg = finalBuyKg * (1 - waste / 100);
     const finalGamPerChild = totalStudents > 0 ? (finalEatKg * 1000) / totalStudents : it.gamPerChild;
 
-    it.gamPerChild = Math.round(finalGamPerChild * 10) / 10;
-    it.customTotalBuy = targetIntegerBuyUnit;
+    it.gamPerChild = Math.round(finalGamPerChild * 100) / 100;
+    it.customTotalBuy = targetBuyUnit;
     it.branchQuantities = branchQtys;
   });
 
   // 5. Vi chỉnh tinh tế (Fine-tuning) ngân sách tiền ăn
-  // Do làm tròn số nguyên ĐVT, chi phí có thể chênh lệch nhẹ với 21.000 đ.
-  // Ta dùng thuật toán tráo đổi 1 đơn vị ĐVT của món có giá vừa phải để đưa chi phí về sát 21.000 đ nhất.
+  // Tinh chỉnh nhẹ trên các món đạm/tinh bột để đưa tổng chi phí sát mức 21.000 đ nhất (sai số <= 100đ)
   let curTotals = computeNutritionTotals(optimizedItems, totalStudents, targetBudget, ageGroup, branches).totals;
   let diffPerChild = curTotals.costPerChild - targetBudget;
 
-  // Nếu chênh lệch > 500đ, tìm nguyên liệu biến đổi để điều chỉnh ±1 ĐVT
-  if (Math.abs(diffPerChild) > 300) {
-    // Sắp xếp các món rau củ hoặc thịt cá phụ
-    const candidates = optimizedItems
-      .filter((it) => !it.isFixed && !it.food.isFixed && it.food.category !== 'gia_vi' && (it.customTotalBuy ?? 0) > 1)
-      .map((it) => {
-        const food = it.food;
-        const deltaUnitCostPerChild = food.price / totalStudents;
-        return {
-          item: it,
-          deltaCost: deltaUnitCostPerChild,
-        };
-      });
+  if (Math.abs(diffPerChild) > 100) {
+    // Tìm các món biến đổi để vi chỉnh (thịt nạc, cá hoặc gạo)
+    const tunableItem = optimizedItems.find(
+      (it) => !it.isFixed && !it.food.isFixed && (it.food.category === 'thit_ca' || it.food.category === 'gao')
+    );
 
-    for (const cand of candidates) {
-      if (Math.abs(diffPerChild) <= 250) break;
-      if (diffPerChild > 250 && (cand.item.customTotalBuy ?? 0) > 1) {
-        // Giảm 1 ĐVT
-        cand.item.customTotalBuy = (cand.item.customTotalBuy ?? 1) - 1;
-        // Phân bổ lại điểm trường
-        const newInt = cand.item.customTotalBuy;
-        if (branches.length > 0) {
-          let alloc = 0;
-          const qts = branches.map((b) => {
-            const q = (newInt * b.studentCount) / totalStudents;
-            const floor = Math.floor(q);
-            alloc += floor;
-            return { id: b.id, floor, frac: q - floor };
-          });
-          let rem = newInt - alloc;
-          qts.sort((a, b) => b.frac - a.frac);
-          const bq: Record<string, number> = {};
-          qts.forEach((q) => {
-            const add = rem > 0 ? 1 : 0;
-            if (rem > 0) rem--;
-            bq[q.id] = q.floor + add;
-          });
-          cand.item.branchQuantities = bq;
-        }
-        // Suy ngược lại gam/trẻ
-        const ex = cand.item.food.gamExchange || 1000;
-        const wst = cand.item.food.wasteFactor || 0;
-        const fBuyKg = (newInt * ex) / 1000;
-        const fEatKg = fBuyKg * (1 - wst / 100);
-        cand.item.gamPerChild = Math.round(((fEatKg * 1000) / totalStudents) * 10) / 10;
+    if (tunableItem) {
+      const food = tunableItem.food;
+      const waste = food.wasteFactor || 0;
+      const exchange = food.gamExchange || 1000;
+      const price = food.price;
 
-        curTotals = computeNutritionTotals(optimizedItems, totalStudents, targetBudget, ageGroup, branches).totals;
-        diffPerChild = curTotals.costPerChild - targetBudget;
+      // Delta thực mua ĐVT cần điều chỉnh
+      const deltaTotalCost = -diffPerChild * totalStudents;
+      const deltaBuyUnit = deltaTotalCost / price;
+
+      const newBuyUnit = Math.max(0.1, Math.round(((tunableItem.customTotalBuy ?? 1) + deltaBuyUnit) * 100) / 100);
+      tunableItem.customTotalBuy = newBuyUnit;
+
+      // Phân bổ lại điểm trường
+      if (branches.length > 0) {
+        let sumB = 0;
+        branches.forEach((b, idx) => {
+          if (idx === branches.length - 1) {
+            tunableItem.branchQuantities = {
+              ...(tunableItem.branchQuantities || {}),
+              [b.id]: Math.max(0, Math.round((newBuyUnit - sumB) * 100) / 100),
+            };
+          } else {
+            const rawB = (newBuyUnit * b.studentCount) / totalStudents;
+            const bVal = Math.round(rawB * 100) / 100;
+            tunableItem.branchQuantities = {
+              ...(tunableItem.branchQuantities || {}),
+              [b.id]: bVal,
+            };
+            sumB += bVal;
+          }
+        });
       }
+
+      // Suy ngược lại gam/trẻ
+      const fBuyKg = (newBuyUnit * exchange) / 1000;
+      const fEatKg = fBuyKg * (1 - waste / 100);
+      tunableItem.gamPerChild = Math.round(((fEatKg * 1000) / totalStudents) * 100) / 100;
     }
   }
 
@@ -393,7 +476,7 @@ export function solveIntegerBuyUnitsMenu(
 
   return {
     success: true,
-    message: `✓ Đã tối ưu Số Lượng Thực Mua ĐVT thành công! (Lượng: ${caloPass} ${Math.round(finalTotals.totalCalo)} Kcal | Chất: ${ratioPass} P-L-G ${finalTotals.proteinPct.toFixed(1)}%:${finalTotals.fatPct.toFixed(1)}%:${finalTotals.carbsPct.toFixed(1)}% | Tiền ăn: ${Math.round(finalTotals.costPerChild).toLocaleString('vi-VN')} đ, lệch: ${finalDiff >= 0 ? '+' : ''}${finalDiff} đ)`,
+    message: `✓ Đã tối ưu Thực Mua ĐVT! Sữa, Trứng: Tròn số nguyên; Dầu, Mắm, Gia vị: Tròn 0.1-0.5; Thịt, Cá, Rau: Để lẻ tự nhiên. (Lượng: ${caloPass} ${Math.round(finalTotals.totalCalo)} Kcal | Chất: ${ratioPass} P-L-G ${finalTotals.proteinPct.toFixed(1)}%:${finalTotals.fatPct.toFixed(1)}%:${finalTotals.carbsPct.toFixed(1)}% | Tiền ăn: ${Math.round(finalTotals.costPerChild).toLocaleString('vi-VN')} đ, lệch: ${finalDiff >= 0 ? '+' : ''}${finalDiff} đ)`,
     items: optimizedItems,
     iterations: 1,
     runtimeMs,

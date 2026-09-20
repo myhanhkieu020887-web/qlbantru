@@ -60,45 +60,64 @@ export function computeMenuItem(
 
     if (hasManualBranchQtys && item.customTotalBuy === undefined) {
       branches.forEach((b) => {
-        branchBuyUnits[b.id] = Math.round(item.branchQuantities?.[b.id] ?? 0);
+        const val = item.branchQuantities?.[b.id] ?? 0;
+        branchBuyUnits[b.id] = Number(val.toFixed(2));
         sumBranches += branchBuyUnits[b.id];
       });
-      actualBuyUnit = sumBranches;
+      actualBuyUnit = Number(sumBranches.toFixed(2));
     } else {
-      // Phân bổ tỷ lệ Hare-Niemeyer / Largest Remainder từ tổng actualBuyUnit để bảo toàn tổng số nguyên
-      const integerTotal = Math.round(actualBuyUnit);
-      actualBuyUnit = integerTotal;
+      // Xác định xem thực phẩm này là số nguyên hay số lẻ
+      const isIntegerFood = Number.isInteger(actualBuyUnit) && actualBuyUnit > 0;
 
-      const exactQuotas = branches.map((b) => ({
-        id: b.id,
-        quota: totalSchoolStudents > 0 ? (integerTotal * b.studentCount) / totalSchoolStudents : 0,
-      }));
+      if (isIntegerFood) {
+        // Phân bổ tỷ lệ Hare-Niemeyer / Largest Remainder từ tổng actualBuyUnit để bảo toàn tổng số nguyên
+        const integerTotal = Math.round(actualBuyUnit);
+        actualBuyUnit = integerTotal;
 
-      // Lấy phần nguyên ban đầu
-      let allocatedSum = 0;
-      const remains = exactQuotas.map((eq) => {
-        const floorVal = Math.floor(eq.quota);
-        allocatedSum += floorVal;
-        return {
-          id: eq.id,
-          floor: floorVal,
-          fraction: eq.quota - floorVal,
-        };
-      });
+        const exactQuotas = branches.map((b) => ({
+          id: b.id,
+          quota: totalSchoolStudents > 0 ? (integerTotal * b.studentCount) / totalSchoolStudents : 0,
+        }));
 
-      // Phân bổ phần dư lớn nhất cho các điểm trường đến khi đủ integerTotal
-      let remainderToDistribute = integerTotal - allocatedSum;
-      remains.sort((a, b) => b.fraction - a.fraction);
+        let allocatedSum = 0;
+        const remains = exactQuotas.map((eq) => {
+          const floorVal = Math.floor(eq.quota);
+          allocatedSum += floorVal;
+          return {
+            id: eq.id,
+            floor: floorVal,
+            fraction: eq.quota - floorVal,
+          };
+        });
 
-      remains.forEach((r) => {
-        let add = 0;
-        if (remainderToDistribute > 0) {
-          add = 1;
-          remainderToDistribute--;
-        }
-        branchBuyUnits[r.id] = r.floor + add;
-        sumBranches += branchBuyUnits[r.id];
-      });
+        let remainderToDistribute = integerTotal - allocatedSum;
+        remains.sort((a, b) => b.fraction - a.fraction);
+
+        remains.forEach((r) => {
+          let add = 0;
+          if (remainderToDistribute > 0) {
+            add = 1;
+            remainderToDistribute--;
+          }
+          branchBuyUnits[r.id] = r.floor + add;
+          sumBranches += branchBuyUnits[r.id];
+        });
+      } else {
+        // Hàng để lẻ (thịt, cá, rau, củ, quả, dầu ăn, gia vị...): Phân bổ số thập phân bảo toàn chính xác tổng mua
+        let runningSum = 0;
+        branches.forEach((b, idx) => {
+          if (idx === branches.length - 1) {
+            branchBuyUnits[b.id] = Number(Math.max(0, actualBuyUnit - runningSum).toFixed(2));
+          } else {
+            const rawShare = totalSchoolStudents > 0 ? (actualBuyUnit * b.studentCount) / totalSchoolStudents : 0;
+            const share = Number(rawShare.toFixed(2));
+            branchBuyUnits[b.id] = share;
+            runningSum += share;
+          }
+          sumBranches += branchBuyUnits[b.id];
+        });
+        actualBuyUnit = Number(sumBranches.toFixed(2));
+      }
     }
 
     actualBuyKg = food.gamExchange > 0 ? (actualBuyUnit * food.gamExchange) / 1000 : actualBuyUnit;

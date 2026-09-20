@@ -25,6 +25,13 @@ export const SolverConfigModal: React.FC<Props> = ({
   const [minScaleFactor, setMinScaleFactor] = useState<number>(config.minScaleFactor ?? 0.5);
   const [maxScaleFactor, setMaxScaleFactor] = useState<number>(config.maxScaleFactor ?? 1.6);
 
+  // Cấu hình bước làm tròn ĐVT
+  const [milkStep, setMilkStep] = useState<number>(config.roundingConfig?.milkStep ?? 1);
+  const [eggStep, setEggStep] = useState<number>(config.roundingConfig?.eggStep ?? 1);
+  const [oilStep, setOilStep] = useState<number>(config.roundingConfig?.oilStep ?? 0.5);
+  const [fishSauceStep, setFishSauceStep] = useState<number>(config.roundingConfig?.fishSauceStep ?? 0.1);
+  const [seasoningStep, setSeasoningStep] = useState<number>(config.roundingConfig?.seasoningStep ?? 0.1);
+
   if (!isOpen) return null;
 
   const handleResetDefault = () => {
@@ -33,6 +40,11 @@ export const SolverConfigModal: React.FC<Props> = ({
     setMacroWeight(1.0);
     setMinScaleFactor(0.5);
     setMaxScaleFactor(1.6);
+    setMilkStep(1);
+    setEggStep(1);
+    setOilStep(0.5);
+    setFishSauceStep(0.1);
+    setSeasoningStep(0.1);
   };
 
   const currentOptions: SolverOptions = {
@@ -42,6 +54,14 @@ export const SolverConfigModal: React.FC<Props> = ({
     macroWeight,
     minScaleFactor,
     maxScaleFactor,
+    roundingConfig: {
+      milkStep,
+      eggStep,
+      oilStep,
+      fishSauceStep,
+      seasoningStep,
+      otherStep: 0.01,
+    },
   };
 
   return (
@@ -177,6 +197,82 @@ export const SolverConfigModal: React.FC<Props> = ({
                 onChange={(e) => setMaxScaleFactor(parseFloat(e.target.value))}
                 className="w-full accent-blue-600 cursor-pointer"
               />
+            </div>
+          </div>
+
+          {/* Quy tắc làm tròn ĐVT khi chạy Solver */}
+          <div className="pt-3 border-t border-slate-100">
+            <span className="font-bold text-slate-800 text-[11px] block mb-1.5">
+              Quy tắc làm tròn Thực mua ĐVT (Solver):
+            </span>
+            <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded border border-slate-200">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Sữa (Hộp/Vỉ):</span>
+                <select
+                  value={milkStep}
+                  onChange={(e) => setMilkStep(parseFloat(e.target.value))}
+                  className="px-1.5 py-0.5 rounded border border-slate-300 font-mono font-bold text-[10.5px] bg-white"
+                >
+                  <option value={1}>1 hộp (nguyên)</option>
+                  <option value={4}>4 hộp (1 lốc)</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Trứng (Quả):</span>
+                <select
+                  value={eggStep}
+                  onChange={(e) => setEggStep(parseFloat(e.target.value))}
+                  className="px-1.5 py-0.5 rounded border border-slate-300 font-mono font-bold text-[10.5px] bg-white"
+                >
+                  <option value={1}>1 quả (nguyên)</option>
+                  <option value={5}>5 quả</option>
+                  <option value={10}>10 quả (1 chục)</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Dầu ăn:</span>
+                <select
+                  value={oilStep}
+                  onChange={(e) => setOilStep(parseFloat(e.target.value))}
+                  className="px-1.5 py-0.5 rounded border border-slate-300 font-mono font-bold text-[10.5px] bg-white"
+                >
+                  <option value={0.5}>0.5 lít</option>
+                  <option value={1}>1 lít / chai</option>
+                  <option value={2}>2 lít / can</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Nước mắm:</span>
+                <select
+                  value={fishSauceStep}
+                  onChange={(e) => setFishSauceStep(parseFloat(e.target.value))}
+                  className="px-1.5 py-0.5 rounded border border-slate-300 font-mono font-bold text-[10.5px] bg-white"
+                >
+                  <option value={0.1}>0.1 lít</option>
+                  <option value={0.5}>0.5 lít</option>
+                  <option value={1}>1 lít / chai</option>
+                </select>
+              </div>
+
+              <div className="col-span-2 flex items-center justify-between pt-1 border-t border-slate-200/60">
+                <span className="text-slate-600">Gia vị nấu (muối, đường, hành...):</span>
+                <select
+                  value={seasoningStep}
+                  onChange={(e) => setSeasoningStep(parseFloat(e.target.value))}
+                  className="px-1.5 py-0.5 rounded border border-slate-300 font-mono font-bold text-[10.5px] bg-white"
+                >
+                  <option value={0.1}>0.1 kg (1 lạng)</option>
+                  <option value={0.5}>0.5 kg (nửa cân)</option>
+                  <option value={1}>1 kg</option>
+                </select>
+              </div>
+
+              <div className="col-span-2 text-[10px] text-emerald-700 bg-emerald-50/70 px-2 py-1 rounded">
+                ✓ <strong>Thực phẩm tươi sống & ngũ cốc</strong> (thịt, cá, tôm, rau, củ, quả, gạo, bún): <strong>để lẻ tự nhiên</strong> (bước 0.01 kg), không ép nguyên.
+              </div>
             </div>
           </div>
         </div>

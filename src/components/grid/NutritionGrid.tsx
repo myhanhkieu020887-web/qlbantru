@@ -456,22 +456,22 @@ export const NutritionGrid: React.FC<Props> = ({
                             </div>
                           </td>
 
-                          {/* CỘT THỰC MUA SỐ NGUYÊN TỪNG ĐIỂM TRƯỜNG */}
+                          {/* CỘT THỰC MUA SỐ LƯỢNG TỪNG ĐIỂM TRƯỜNG */}
                           {colConfig.showBranches && branches.length > 0 && branches.map((b) => {
                             const branchQty = it.branchBuyUnits?.[b.id] ?? 0;
                             return (
                               <td key={b.id} className="py-0.2 px-0.5 border-r border-slate-200 text-right bg-amber-50/40">
                                 <input
                                   type="number"
-                                  step="1"
+                                  step="0.01"
                                   min="0"
                                   disabled={isInputDisabled}
                                   value={branchQty}
                                   onChange={(e) => {
-                                    const val = Math.round(parseFloat(e.target.value) || 0);
-                                    if (onUpdateBranchBuy) onUpdateBranchBuy(it.id, b.id, val);
+                                    const val = parseFloat(e.target.value) || 0;
+                                    if (onUpdateBranchBuy) onUpdateBranchBuy(it.id, b.id, Number(val.toFixed(2)));
                                   }}
-                                  title={`Định dạng phải là số nguyên cho ${b.code}`}
+                                  title={`Số lượng thực mua cho ${b.code}`}
                                   className={`w-full text-right font-mono font-bold px-1 py-0.2 rounded text-[11px] focus:outline-none ${
                                     isInputDisabled
                                       ? 'bg-transparent text-slate-500 cursor-not-allowed'
@@ -487,13 +487,13 @@ export const NutritionGrid: React.FC<Props> = ({
                             {onUpdateTotalBuyUnit ? (
                               <input
                                 type="number"
-                                step={it.food.category === 'gia_vi' ? '0.1' : '1'}
+                                step="0.01"
                                 min="0"
                                 disabled={isInputDisabled}
                                 value={it.actualBuyUnit}
                                 onChange={(e) => {
                                   const val = parseFloat(e.target.value);
-                                  onUpdateTotalBuyUnit(it.id, isNaN(val) ? 0 : val);
+                                  onUpdateTotalBuyUnit(it.id, isNaN(val) ? 0 : Number(val.toFixed(2)));
                                 }}
                                 title="Gõ trực tiếp số lượng thực mua ĐVT cả trường - Hệ thống tự động suy ngược ra gam/trẻ và chia đều cho điểm trường"
                                 className={`w-full text-right font-mono font-bold px-1 py-0.2 rounded text-[11px] focus:outline-none ${
@@ -504,7 +504,7 @@ export const NutritionGrid: React.FC<Props> = ({
                               />
                             ) : (
                               <span className="font-mono font-bold text-slate-900 text-[11px] px-1">
-                                {formatNumber(it.actualBuyUnit, 1)}
+                                {formatNumber(it.actualBuyUnit, 2)}
                               </span>
                             )}
                           </td>

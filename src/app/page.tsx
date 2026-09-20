@@ -499,25 +499,40 @@ export default function PMSDashboardPage() {
         const waste = food.wasteFactor || 0;
         const exchange = food.gamExchange || 1000;
 
-        // Phân bổ tỷ lệ số nguyên cho từng điểm trường (Hare-Niemeyer)
+        // Phân bổ tỷ lệ cho từng điểm trường bảo toàn tổng mua
         const branchQtys: Record<string, number> = {};
         if (branches.length > 0) {
-          const intTotal = Math.round(safeBuyUnit);
-          let allocatedSum = 0;
-          const quotas = branches.map((b) => {
-            const q = (intTotal * b.studentCount) / totalStudents;
-            const floor = Math.floor(q);
-            allocatedSum += floor;
-            return { id: b.id, floor, fraction: q - floor };
-          });
+          const isInteger = Number.isInteger(safeBuyUnit) && safeBuyUnit > 0;
+          if (isInteger) {
+            const intTotal = Math.round(safeBuyUnit);
+            let allocatedSum = 0;
+            const quotas = branches.map((b) => {
+              const q = (intTotal * b.studentCount) / totalStudents;
+              const floor = Math.floor(q);
+              allocatedSum += floor;
+              return { id: b.id, floor, fraction: q - floor };
+            });
 
-          let rem = intTotal - allocatedSum;
-          quotas.sort((a, b) => b.fraction - a.fraction);
-          quotas.forEach((q) => {
-            const add = rem > 0 ? 1 : 0;
-            if (rem > 0) rem--;
-            branchQtys[q.id] = q.floor + add;
-          });
+            let rem = intTotal - allocatedSum;
+            quotas.sort((a, b) => b.fraction - a.fraction);
+            quotas.forEach((q) => {
+              const add = rem > 0 ? 1 : 0;
+              if (rem > 0) rem--;
+              branchQtys[q.id] = q.floor + add;
+            });
+          } else {
+            // Số lẻ (thịt, cá, rau, gia vị...): chia tỷ lệ thập phân 2 chữ số
+            let runningSum = 0;
+            branches.forEach((b, idx) => {
+              if (idx === branches.length - 1) {
+                branchQtys[b.id] = Number(Math.max(0, safeBuyUnit - runningSum).toFixed(2));
+              } else {
+                const bVal = Number(((safeBuyUnit * b.studentCount) / totalStudents).toFixed(2));
+                branchQtys[b.id] = bVal;
+                runningSum += bVal;
+              }
+            });
+          }
         }
 
         // Công thức suy ngược bảo toàn:
@@ -561,10 +576,10 @@ export default function PMSDashboardPage() {
     }));
   };
 
-  // Cập nhật số nguyên thực mua theo từng điểm trường (VD: Đ1=28, Đ2=12 -> Tổng=40)
+  // Cập nhật số lượng thực mua theo từng điểm trường (hỗ trợ cả số nguyên và số lẻ)
   const handleUpdateBranchBuy = (itemId: string, branchId: string, newQty: number) => {
     if (currentPlan.status === 'LOCKED') return;
-    const roundedQty = Math.max(0, Math.round(newQty));
+    const safeQty = Math.max(0, Number(newQty.toFixed(2)));
     updateCurrentPlan((prev) => {
       const totalStudents = branches.length > 0
         ? branches.reduce((sum, b) => sum + b.studentCount, 0)
@@ -573,9 +588,9 @@ export default function PMSDashboardPage() {
       const newItems = prev.items.map((it) => {
         if (it.id !== itemId) return it;
         const currentBranchQtys = it.branchQuantities ? { ...it.branchQuantities } : {};
-        currentBranchQtys[branchId] = roundedQty;
-        // Tổng mua điểm trường = tổng số nguyên các điểm
-        const customTotal = Object.values(currentBranchQtys).reduce((sum, v) => sum + v, 0);
+        currentBranchQtys[branchId] = safeQty;
+        // Tổng mua điểm trường = tổng các điểm
+        const customTotal = Number(Object.values(currentBranchQtys).reduce((sum, v) => sum + v, 0).toFixed(2));
 
         // Đồng bộ suy ngược ra gam/trẻ
         const food = it.food;
