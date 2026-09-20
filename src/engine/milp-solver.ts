@@ -187,7 +187,7 @@ export function solveNutritionMenu(
 
   // 4.1 Vi chỉnh món đạm động vật chính (thịt / cá / tôm) trước vì đạm chiếm tỷ trọng tiền cao nhất
   const proteinItem = optimizedItems.find(
-    (it) => it.food.category === 'thit_ca' && !isItemFixed(it) && it.gamPerChild >= 15
+    (it) => it.food.category === 'thit_ca' && !isItemFixed(it) && it.gamPerChild >= 15 && (it.food.unit.toLowerCase() === 'kg' || it.food.unit.toLowerCase() === 'g')
   );
   if (proteinItem) {
     const food = proteinItem.food;
@@ -197,7 +197,7 @@ export function solveNutritionMenu(
 
     if (cost1g > 0) {
       const deltaProteinG = residual / cost1g;
-      const newProteinG = Math.max(12, Math.min(50, proteinItem.gamPerChild + deltaProteinG));
+      const newProteinG = Math.max(12, Math.min(75, proteinItem.gamPerChild + deltaProteinG));
       const actualDeltaG = newProteinG - proteinItem.gamPerChild;
       proteinItem.gamPerChild = Math.round(newProteinG * 10) / 10;
       residual -= actualDeltaG * cost1g;
@@ -213,8 +213,8 @@ export function solveNutritionMenu(
     const cost1g = (food.price / (food.gamExchange || 1000)) * buyFactor;
 
     if (cost1g > 0) {
-      const minG = Math.max(15, grainItem.gamPerChild - 15);
-      const maxG = grainItem.gamPerChild + 15;
+      const minG = Math.max(20, grainItem.gamPerChild - 30);
+      const maxG = Math.min(140, grainItem.gamPerChild + 30);
       const targetGrainG = Math.max(minG, Math.min(maxG, grainItem.gamPerChild + residual / cost1g));
       grainItem.gamPerChild = Math.round(targetGrainG * 10) / 10;
     }
@@ -415,55 +415,126 @@ export function solveIntegerBuyUnitsMenu(
     it.branchQuantities = branchQtys;
   });
 
-  // 5. Vi chỉnh tinh tế (Fine-tuning) ngân sách tiền ăn
-  // Tinh chỉnh nhẹ trên các món đạm/tinh bột để đưa tổng chi phí sát mức 21.000 đ nhất (sai số <= 100đ)
+  // 5. Khóa Cứng Ngân Sách Tuyệt Đối: Dùng hết 100% số tiền 1 ngày của trẻ (Sai số 0 đồng tuyệt đối)
+  const targetTotalSchoolBudget = Math.round(totalStudents * targetBudget);
   let curTotals = computeNutritionTotals(optimizedItems, totalStudents, targetBudget, ageGroup, branches).totals;
-  let diffPerChild = curTotals.costPerChild - targetBudget;
+  let totalDiff = targetTotalSchoolBudget - Math.round(curTotals.totalCost);
 
-  if (Math.abs(diffPerChild) > 100) {
-    // Tìm các món biến đổi để vi chỉnh (thịt nạc, cá hoặc gạo)
-    const tunableItem = optimizedItems.find(
-      (it) => !it.isFixed && !it.food.isFixed && (it.food.category === 'thit_ca' || it.food.category === 'gao')
+  if (totalDiff !== 0) {
+    // Chỉ chọn các mặt hàng để lẻ tự nhiên (step === 0.01: thịt, cá, tôm, gạo, rau củ) để vi chỉnh
+    // TUYỆT ĐỐI KHÔNG vi chỉnh vào mặt hàng làm tròn nguyên (trứng, sữa) hoặc dầu ăn/gia vị làm tròn 0.1/0.5
+    const candidateItems = optimizedItems.filter(
+      (it) => !it.isFixed && !it.food.isFixed && getFoodRoundingStep(it.food, roundingCfg) === 0.01
     );
 
-    if (tunableItem) {
-      const food = tunableItem.food;
-      const waste = food.wasteFactor || 0;
-      const exchange = food.gamExchange || 1000;
-      const price = food.price;
+    if (candidateItems.length > 0) {
+      const candidates = candidateItems.map((it) => {
+        const effectivePrice = it.food.contractPrice && it.food.contractPrice > 0 ? it.food.contractPrice : it.food.price;
+        return {
+          item: it,
+          pricePerUnit: effectivePrice,
+          stepPrice: effectivePrice / 100, // Giá của 0.01 ĐVT
+        };
+      });
 
-      // Delta thực mua ĐVT cần điều chỉnh
-      const deltaTotalCost = -diffPerChild * totalStudents;
-      const deltaBuyUnit = deltaTotalCost / price;
+      // 5.1 Vi chỉnh thô nếu độ lệch ngân sách lớn (> 3.000 đ)
+      if (Math.abs(totalDiff) > 3000) {
+        const primary = candidates[0];
+        const rawDeltaBuy = totalDiff / primary.pricePerUnit;
+        const deltaUnits = Math.round(rawDeltaBuy * 100) / 100;
+        const currentBuy = primary.item.customTotalBuy ?? 0;
+        const newBuyUnit = Number(Math.max(0.01, currentBuy + deltaUnits).toFixed(2));
+        primary.item.customTotalBuy = newBuyUnit;
 
-      const newBuyUnit = Math.max(0.1, Math.round(((tunableItem.customTotalBuy ?? 1) + deltaBuyUnit) * 100) / 100);
-      tunableItem.customTotalBuy = newBuyUnit;
+        const food = primary.item.food;
+        const waste = food.wasteFactor || 0;
+        const exchange = food.gamExchange || 1000;
 
-      // Phân bổ lại điểm trường
-      if (branches.length > 0) {
-        let sumB = 0;
-        branches.forEach((b, idx) => {
-          if (idx === branches.length - 1) {
-            tunableItem.branchQuantities = {
-              ...(tunableItem.branchQuantities || {}),
-              [b.id]: Math.max(0, Math.round((newBuyUnit - sumB) * 100) / 100),
-            };
-          } else {
-            const rawB = (newBuyUnit * b.studentCount) / totalStudents;
-            const bVal = Math.round(rawB * 100) / 100;
-            tunableItem.branchQuantities = {
-              ...(tunableItem.branchQuantities || {}),
-              [b.id]: bVal,
-            };
-            sumB += bVal;
-          }
-        });
+        if (branches.length > 0) {
+          let sumB = 0;
+          const newBranchQtys: Record<string, number> = {};
+          branches.forEach((b, bIdx) => {
+            if (bIdx === branches.length - 1) {
+              newBranchQtys[b.id] = Number(Math.max(0, newBuyUnit - sumB).toFixed(2));
+            } else {
+              const bVal = Number(((newBuyUnit * b.studentCount) / totalStudents).toFixed(2));
+              newBranchQtys[b.id] = bVal;
+              sumB += bVal;
+            }
+          });
+          primary.item.branchQuantities = newBranchQtys;
+        }
+
+        const fBuyKg = (newBuyUnit * exchange) / 1000;
+        const fEatKg = fBuyKg * (1 - waste / 100);
+        primary.item.gamPerChild = Math.round(((fEatKg * 1000) / totalStudents) * 100) / 100;
+
+        // Cập nhật lại curTotals và totalDiff sau bước thô
+        curTotals = computeNutritionTotals(optimizedItems, totalStudents, targetBudget, ageGroup, branches).totals;
+        totalDiff = targetTotalSchoolBudget - Math.round(curTotals.totalCost);
       }
 
-      // Suy ngược lại gam/trẻ
-      const fBuyKg = (newBuyUnit * exchange) / 1000;
-      const fEatKg = fBuyKg * (1 - waste / 100);
-      tunableItem.gamPerChild = Math.round(((fEatKg * 1000) / totalStudents) * 100) / 100;
+      // 5.2 Tìm tổ hợp bước nhảy delta 0.01 ĐVT (s1, s2, s3...) sao cho triệt tiêu hoàn toàn totalDiff về 0 đồng
+      if (totalDiff !== 0) {
+        const c1 = candidates[0];
+        const c2 = candidates.length > 1 ? candidates[1] : null;
+        const c3 = candidates.length > 2 ? candidates[2] : null;
+
+        let bestSteps: number[] | null = null;
+        let minPenalty = Infinity;
+
+        // Quét tổ hợp Diophantine với trọng số phạt ưu tiên s1 (thịt/cá chính) và s2 (gạo)
+        for (let s1 = -40; s1 <= 40; s1++) {
+          for (let s2 = (c2 ? -60 : 0); s2 <= (c2 ? 60 : 0); s2++) {
+            for (let s3 = (c3 ? -40 : 0); s3 <= (c3 ? 40 : 0); s3++) {
+              const sumDelta = s1 * c1.stepPrice + (c2 ? s2 * c2.stepPrice : 0) + (c3 ? s3 * c3.stepPrice : 0);
+              if (Math.round(sumDelta) === totalDiff) {
+                const penalty = Math.abs(s1) * 2 + Math.abs(s2) * 1 + Math.abs(s3) * 1.5;
+                if (penalty < minPenalty) {
+                  minPenalty = penalty;
+                  bestSteps = [s1, s2, s3];
+                }
+              }
+            }
+          }
+        }
+
+        if (bestSteps) {
+          bestSteps.forEach((s, idx) => {
+            if (s === 0) return;
+            const cand = candidates[idx];
+            if (!cand) return;
+            const currentBuy = cand.item.customTotalBuy ?? 0;
+            const newBuyUnit = Number(Math.max(0.01, currentBuy + s * 0.01).toFixed(2));
+            cand.item.customTotalBuy = newBuyUnit;
+
+            const food = cand.item.food;
+            const waste = food.wasteFactor || 0;
+            const exchange = food.gamExchange || 1000;
+
+            // Phân bổ lại cho các điểm trường bảo toàn tổng mua
+            if (branches.length > 0) {
+              let sumB = 0;
+              const newBranchQtys: Record<string, number> = {};
+              branches.forEach((b, bIdx) => {
+                if (bIdx === branches.length - 1) {
+                  newBranchQtys[b.id] = Number(Math.max(0, newBuyUnit - sumB).toFixed(2));
+                } else {
+                  const bVal = Number(((newBuyUnit * b.studentCount) / totalStudents).toFixed(2));
+                  newBranchQtys[b.id] = bVal;
+                  sumB += bVal;
+                }
+              });
+              cand.item.branchQuantities = newBranchQtys;
+            }
+
+            // Đồng bộ suy ngược ra gam/trẻ
+            const fBuyKg = (newBuyUnit * exchange) / 1000;
+            const fEatKg = fBuyKg * (1 - waste / 100);
+            cand.item.gamPerChild = Math.round(((fEatKg * 1000) / totalStudents) * 100) / 100;
+          });
+        }
+      }
     }
   }
 
