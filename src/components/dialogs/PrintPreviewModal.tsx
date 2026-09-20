@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import { DailyMenuPlan, NutritionTotals } from '../../types/nutrition';
+import { DailyMenuPlan, NutritionTotals, SchoolBranch } from '../../types/nutrition';
 import { computeNutritionTotals } from '../../engine/atwater';
-import { Printer, X, FileText, CheckCircle2, AlertCircle, Download, Loader2 } from 'lucide-react';
+import { downloadBranchMarketExcelInBrowser } from '../../lib/excel/exporter';
+import { Printer, X, FileText, CheckCircle2, AlertCircle, Download, Loader2, FileSpreadsheet } from 'lucide-react';
 
 interface Props {
   plan: DailyMenuPlan;
   totals?: NutritionTotals;
+  branches?: SchoolBranch[];
   isOpen: boolean;
   onClose: () => void;
 }
@@ -17,6 +19,7 @@ type PrintTemplateType = 'phieu_ke_cho' | 'so_khau_phan_01mn' | 'kiem_thuc_3_buo
 export const PrintPreviewModal: React.FC<Props> = ({
   plan,
   totals: customTotals,
+  branches = [],
   isOpen,
   onClose,
 }) => {
@@ -70,6 +73,19 @@ export const PrintPreviewModal: React.FC<Props> = ({
     }
   };
 
+  const [isExportingExcel, setIsExportingExcel] = useState<boolean>(false);
+
+  const handleExportBranchExcel = async () => {
+    setIsExportingExcel(true);
+    try {
+      await downloadBranchMarketExcelInBrowser(plan, branches);
+    } catch (err) {
+      alert('Có lỗi khi xuất file Excel đi chợ: ' + (err instanceof Error ? err.message : ''));
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 print:p-0 print:static print:bg-white">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-300 print:border-none print:shadow-none print:max-h-none print:w-full">
@@ -95,6 +111,17 @@ export const PrintPreviewModal: React.FC<Props> = ({
               <option value="kiem_thuc_3_buoc">3. Sổ kiểm thực 3 bước (QĐ 1246/QĐ-BYT)</option>
               <option value="phieu_xuat_kho_02vt">4. Phiếu xuất kho thực phẩm (Mẫu 02-VT TT 107)</option>
             </select>
+
+            <button
+              type="button"
+              onClick={handleExportBranchExcel}
+              disabled={isExportingExcel}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white rounded text-xs font-bold shadow-md transition-all cursor-pointer"
+              title="Xuất file Excel đa Sheet phân bổ mua hàng từng điểm trường (Đ1 & Đ2)"
+            >
+              {isExportingExcel ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
+              <span>{isExportingExcel ? 'Đang xuất...' : 'Excel Đi Chợ (Đ1+Đ2)'}</span>
+            </button>
 
             <button
               type="button"

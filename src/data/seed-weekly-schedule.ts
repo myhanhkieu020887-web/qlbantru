@@ -283,3 +283,69 @@ export const SEED_WEEKLY_SCHEDULE: DayMenuBundle[] = [
     ]),
   },
 ];
+
+/**
+ * Khởi tạo tuần thực đơn trống sạch (dùng cho dữ liệu chính thức / nạp từ Excel)
+ */
+export function createBlankWeeklySchedule(startDateStr: string = '2026-09-07'): DayMenuBundle[] {
+  const d = new Date(startDateStr);
+  const dayNames = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+  const bundles: DayMenuBundle[] = [];
+
+  for (let i = 0; i < 5; i++) {
+    const curDate = new Date(d);
+    curDate.setDate(d.getDate() + i);
+    const dateStr = curDate.toISOString().split('T')[0];
+    const dow = dayNames[curDate.getDay()];
+
+    bundles.push({
+      date: dateStr,
+      dayOfWeek: dow,
+      maugiao: {
+        id: `official_mg_${dateStr}`,
+        date: dateStr,
+        schoolName: 'Trường Mẫu Giáo Hàm Thắng',
+        divisionName: 'UBND PHƯỜNG HÀM THẮNG',
+        ageGroup: 'maugiao',
+        studentCount: 1210,
+        mealPricePerChild: 21000,
+        serviceFee: 0,
+        menuCode: `MG.${dateStr}`,
+        menuTitle: { trua: '', xe: '', phu_xe: '' },
+        status: 'DRAFT',
+        items: [],
+      },
+      nhatre: {
+        id: `official_nt_${dateStr}`,
+        date: dateStr,
+        schoolName: 'Trường Mẫu Giáo Hàm Thắng',
+        divisionName: 'UBND PHƯỜNG HÀM THẮNG',
+        ageGroup: 'nhatre',
+        studentCount: 120,
+        mealPricePerChild: 21000,
+        serviceFee: 0,
+        menuCode: `NT.${dateStr}`,
+        menuTitle: { trua: '', xe: '', phu_xe: '' },
+        status: 'DRAFT',
+        items: [],
+      },
+      ansang: {
+        id: `official_as_${dateStr}`,
+        date: dateStr,
+        schoolName: 'Trường Mẫu Giáo Hàm Thắng',
+        divisionName: 'UBND PHƯỜNG HÀM THẮNG',
+        ageGroup: 'ansang',
+        studentCount: 350,
+        mealPricePerChild: 7000,
+        serviceFee: 0,
+        menuCode: `SÁNG.${dateStr}`,
+        menuTitle: { sang: '' },
+        status: 'DRAFT',
+        items: [],
+      },
+    });
+  }
+
+  return bundles;
+}
+

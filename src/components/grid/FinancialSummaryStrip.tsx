@@ -16,6 +16,11 @@ import {
   Sparkles,
   RefreshCw,
   SlidersHorizontal,
+  BookOpen,
+  FileSpreadsheet,
+  Download,
+  Loader2,
+  RotateCcw,
 } from 'lucide-react';
 import { BranchSwitcher } from '../navigation/BranchSwitcher';
 
@@ -51,6 +56,11 @@ interface Props {
   onOpenAuto20DaysModal?: () => void;
   onOpenAiSuggest?: () => void;
   onOpenSolverConfig?: () => void;
+  onOpenWorkflowGuide?: () => void;
+  onOpenExcelImport?: () => void;
+  onExportBranchExcel?: () => void;
+  isExportingBranchExcel?: boolean;
+  onResetBlankMenu?: () => void;
   isLocked?: boolean;
   canEditNutrients?: boolean;
 }
@@ -87,6 +97,11 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
   onOpenAuto20DaysModal,
   onOpenAiSuggest,
   onOpenSolverConfig,
+  onOpenWorkflowGuide,
+  onOpenExcelImport,
+  onExportBranchExcel,
+  isExportingBranchExcel = false,
+  onResetBlankMenu,
   isLocked = false,
   canEditNutrients = true,
 }) => {
@@ -253,6 +268,59 @@ export const FinancialSummaryStrip: React.FC<Props> = ({
               >
                 <SlidersHorizontal className="w-3 h-3 text-blue-600" />
                 <span className="hidden md:inline">Solver</span>
+              </button>
+            )}
+
+            {onOpenWorkflowGuide && (
+              <button
+                type="button"
+                onClick={onOpenWorkflowGuide}
+                className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-blue-700 hover:text-blue-900 hover:bg-white rounded transition cursor-pointer"
+                title="Xem hướng dẫn quy trình bán trú 5 bước chuẩn QĐ 2195"
+              >
+                <BookOpen className="w-3 h-3 text-blue-600" />
+                <span className="hidden md:inline">Quy trình (SOP)</span>
+              </button>
+            )}
+
+            {onOpenExcelImport && (
+              <button
+                type="button"
+                onClick={onOpenExcelImport}
+                className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-emerald-700 hover:text-emerald-900 hover:bg-white rounded transition cursor-pointer"
+                title="Tải lên file Excel thực đơn mẫu để nạp tự động"
+              >
+                <FileSpreadsheet className="w-3 h-3 text-emerald-600" />
+                <span className="hidden md:inline">Nhập Excel</span>
+              </button>
+            )}
+
+            {onExportBranchExcel && (
+              <button
+                type="button"
+                onClick={onExportBranchExcel}
+                disabled={isExportingBranchExcel}
+                className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-teal-800 hover:text-teal-900 hover:bg-white rounded transition disabled:opacity-50 cursor-pointer"
+                title="Xuất file Excel đa sheet phân bổ tiếp phẩm cho từng điểm trường (Đ1 & Đ2)"
+              >
+                {isExportingBranchExcel ? (
+                  <Loader2 className="w-3 h-3 animate-spin text-teal-600" />
+                ) : (
+                  <Download className="w-3 h-3 text-teal-600" />
+                )}
+                <span className="hidden md:inline">Đi chợ điểm trường</span>
+              </button>
+            )}
+
+            {onResetBlankMenu && (
+              <button
+                type="button"
+                onClick={onResetBlankMenu}
+                className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold text-slate-500 hover:text-rose-700 hover:bg-white rounded transition cursor-pointer"
+                title="Làm mới thực đơn ngày hiện tại về trạng thái sạch"
+              >
+                <RotateCcw className="w-3 h-3 text-slate-400" />
+                <span className="hidden md:inline">Xóa mẫu</span>
               </button>
             )}
           </div>

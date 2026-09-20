@@ -82,8 +82,13 @@ import { MenuTemplateItem } from '../types/menu-template';
 import { PrintPreviewModal } from '../components/dialogs/PrintPreviewModal';
 import { SolverConfigModal } from '../components/dialogs/SolverConfigModal';
 import { AiMenuSuggestModal } from '../components/dialogs/AiMenuSuggestModal';
+import { ImportMenuExcelModal } from '../components/dialogs/ImportMenuExcelModal';
+import { WorkflowGuideModal } from '../components/dialogs/WorkflowGuideModal';
 import { SolverOptions } from '../engine/milp-solver';
 import { AiMenuSuggestionResult } from '../lib/services/AiMenuService';
+import { ParsedDayMenu } from '../lib/excel/menu-importer';
+import { createBlankWeeklySchedule } from '../data/seed-weekly-schedule';
+import { downloadBranchMarketExcelInBrowser } from '../lib/excel/exporter';
 
 // Supplier & Invoices (Quy trình công nợ 3 bước & Multi-campus)
 import { SupplierListView } from '../components/views/SupplierListView';
@@ -216,6 +221,9 @@ export default function PMSDashboardPage() {
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
   const [isSolverConfigOpen, setIsSolverConfigOpen] = useState<boolean>(false);
   const [isAiSuggestOpen, setIsAiSuggestOpen] = useState<boolean>(false);
+  const [isExcelImportOpen, setIsExcelImportOpen] = useState<boolean>(false);
+  const [isWorkflowGuideOpen, setIsWorkflowGuideOpen] = useState<boolean>(false);
+  const [isExportingBranchExcel, setIsExportingBranchExcel] = useState<boolean>(false);
   const [solverConfig, setSolverConfig] = useState<SolverOptions>({
     costWeight: 1.2,
     caloWeight: 3.0,
@@ -528,6 +536,68 @@ export default function PMSDashboardPage() {
       status: 'DRAFT',
     }));
     showToast('Đã xóa món ăn khỏi thực đơn', 'info');
+  };
+
+  // Nạp thực đơn phân tích từ file Excel vào thực đơn hiện tại
+  const handleApplyParsedMenu = (parsedDay: ParsedDayMenu) => {
+    if (currentPlan.status === 'LOCKED') {
+      showToast('Thực đơn đang bị khóa, không thể nạp mới!', 'error');
+      return;
+    }
+
+    const newItems: MenuItem[] = parsedDay.items.map((pi, idx) => {
+      const matched = pi.matchedFood || STANDARD_FOOD_CATALOG[0];
+      return {
+        id: `excel_${Date.now()}_${idx}`,
+        foodId: matched.id,
+        food: matched,
+        mealSession: pi.mealSession,
+        gamPerChild: pi.gamPerChild > 0 ? pi.gamPerChild : 10,
+        dishName: pi.dishName || undefined,
+        isFixed: false,
+      };
+    });
+
+    updateCurrentPlan((prev) => ({
+      ...prev,
+      items: newItems,
+      status: 'DRAFT',
+    }));
+
+    showToast(`✓ Đã nạp ${newItems.length} thực phẩm từ Excel thành công!`, 'success');
+  };
+
+  // Xuất file Excel đi chợ phân bổ đa sheet theo điểm trường
+  const handleExportBranchMarketExcel = async () => {
+    setIsExportingBranchExcel(true);
+    try {
+      await downloadBranchMarketExcelInBrowser(currentPlan, branches);
+      showToast('✓ Đã xuất file Excel đi chợ đa sheet theo điểm trường thành công!', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Lỗi khi xuất file Excel đi chợ', 'error');
+    } finally {
+      setIsExportingBranchExcel(false);
+    }
+  };
+
+  // Reset thực đơn mẫu để bắt đầu nhập dữ liệu chính thức
+  const handleResetBlankMenu = () => {
+    if (currentPlan.status === 'LOCKED') {
+      showToast('Thực đơn đang khóa, không thể xóa!', 'error');
+      return;
+    }
+    const confirmed = window.confirm(
+      'Bạn có chắc chắn muốn xóa toàn bộ món ăn giả lập để nhập thực đơn chính thức cho ngày này không?'
+    );
+    if (!confirmed) return;
+
+    updateCurrentPlan((prev) => ({
+      ...prev,
+      items: [],
+      status: 'DRAFT',
+    }));
+    showToast('Đã xóa sạch thực đơn giả lập. Bạn có thể bấm "Nhập Excel" hoặc thêm món mới!', 'info');
   };
 
   // 7. Thêm giao dịch kho (Nhập / Xuất)
@@ -1430,6 +1500,11 @@ export default function PMSDashboardPage() {
                 onOpenAuto20DaysModal={() => setIsAuto20DaysModalOpen(true)}
                 onOpenAiSuggest={() => setIsAiSuggestOpen(true)}
                 onOpenSolverConfig={() => setIsSolverConfigOpen(true)}
+                onOpenWorkflowGuide={() => setIsWorkflowGuideOpen(true)}
+                onOpenExcelImport={() => setIsExcelImportOpen(true)}
+                onExportBranchExcel={handleExportBranchMarketExcel}
+                isExportingBranchExcel={isExportingBranchExcel}
+                onResetBlankMenu={handleResetBlankMenu}
                 isLocked={isLocked}
                 canEditNutrients={rolePerm.canEditNutrients}
               />
@@ -1608,6 +1683,7 @@ export default function PMSDashboardPage() {
         onClose={() => setIsPrintModalOpen(false)}
         plan={currentPlan}
         totals={totals}
+        branches={branches}
       />
 
       {/* MODAL CẤU HÌNH TRỌNG SỐ VÀ BIÊN ĐỘ SOLVER MILP */}
@@ -1629,6 +1705,31 @@ export default function PMSDashboardPage() {
         budgetPerStudent={currentPlan.mealPricePerChild}
         recentDishes={schedule.map((b) => b.maugiao.menuCode).filter(Boolean)}
         onApplySuggestion={handleApplyAiSuggestion}
+      />
+
+      {/* MODAL NHẬP THỰC ĐƠN TỪ FILE EXCEL MẪU CHUẨN */}
+      <ImportMenuExcelModal
+        isOpen={isExcelImportOpen}
+        onClose={() => setIsExcelImportOpen(false)}
+        onApplyParsedMenu={handleApplyParsedMenu}
+      />
+
+      {/* MODAL HƯỚNG DẪN TOÀN BỘ QUY TRÌNH BÁN TRÚ CHUẨN (SOP 5 BƯỚC) */}
+      <WorkflowGuideModal
+        isOpen={isWorkflowGuideOpen}
+        onClose={() => setIsWorkflowGuideOpen(false)}
+        onOpenExcelImport={() => {
+          setIsWorkflowGuideOpen(false);
+          setIsExcelImportOpen(true);
+        }}
+        onRunSolver={() => {
+          setIsWorkflowGuideOpen(false);
+          handleRunSolver();
+        }}
+        onExportBranchExcel={() => {
+          setIsWorkflowGuideOpen(false);
+          handleExportBranchMarketExcel();
+        }}
       />
 
       {/* Toast Notification */}
