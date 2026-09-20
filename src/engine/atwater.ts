@@ -8,7 +8,8 @@ import { ComputedMenuItem, MenuItem, NutritionTotals, AgeGroup, MealCaloEvaluati
 export function computeMenuItem(
   item: MenuItem,
   studentCount: number,
-  branches?: SchoolBranch[]
+  branches?: SchoolBranch[],
+  selectedBranchId?: string
 ): ComputedMenuItem {
   const { food, gamPerChild } = item;
   const waste = food.wasteFactor || 0;
@@ -55,10 +56,10 @@ export function computeMenuItem(
     const totalSchoolStudents = branches.reduce((sum, b) => sum + b.studentCount, 0) || studentCount;
     let sumBranches = 0;
 
-    // Kiểm tra xem người dùng có gõ tay từng điểm trường hay không
+    // Kiểm tra xem món ăn đã có số lượng phân bổ cho từng điểm trường hay chưa
     const hasManualBranchQtys = item.branchQuantities && Object.keys(item.branchQuantities).length > 0;
 
-    if (hasManualBranchQtys && item.customTotalBuy === undefined) {
+    if (hasManualBranchQtys) {
       branches.forEach((b) => {
         const val = item.branchQuantities?.[b.id] ?? 0;
         branchBuyUnits[b.id] = Number(val.toFixed(2));
@@ -126,6 +127,9 @@ export function computeMenuItem(
   // Thành tiền cả trường (Ưu tiên giá hợp đồng nhà cung cấp nếu có)
   const effectivePrice = food.contractPrice && food.contractPrice > 0 ? food.contractPrice : food.price;
   const totalPrice = actualBuyUnit * effectivePrice;
+  const branchPrice = selectedBranchId && selectedBranchId !== 'all' && branchBuyUnits
+    ? (branchBuyUnits[selectedBranchId] ?? 0) * effectivePrice
+    : totalPrice;
 
   // Dinh dưỡng tính trên 1 trẻ (gamPerChild / 100)
   const factor = gamPerChild / 100;
@@ -158,6 +162,7 @@ export function computeMenuItem(
     branchBuyUnits,
     unitPrice: food.price,
     totalPrice,
+    branchPrice,
     proteinAnimal,
     proteinPlant,
     fatAnimal,
@@ -181,9 +186,10 @@ export function computeNutritionTotals(
   studentCount: number,
   budgetPerChild: number,
   ageGroup: AgeGroup = 'maugiao',
-  branches?: SchoolBranch[]
+  branches?: SchoolBranch[],
+  selectedBranchId?: string
 ): { computedItems: ComputedMenuItem[]; totals: NutritionTotals } {
-  const computedItems = items.map((it) => computeMenuItem(it, studentCount, branches));
+  const computedItems = items.map((it) => computeMenuItem(it, studentCount, branches, selectedBranchId));
 
   let totalCost = 0;
   let proteinAnimalG = 0;
@@ -289,15 +295,39 @@ export function computeNutritionTotals(
     }
   }
 
+  // Xác định sĩ số và ngân sách thực tế theo Điểm trường đang chọn (Đ1, Đ2 hoặc Toàn trường)
+  let effectiveStudentCount = studentCount;
+  let effectiveTotalCost = totalCost;
+  let effectiveTotalBudget = totalBudget;
+  let effectiveCostPerChild = costPerChild;
+  let effectiveBudgetDifference = budgetDifference;
+
+  if (selectedBranchId && selectedBranchId !== 'all' && branchCosts[selectedBranchId] !== undefined) {
+    const targetBranch = branches?.find((b) => b.id === selectedBranchId);
+    effectiveStudentCount = targetBranch ? targetBranch.studentCount : studentCount;
+    effectiveTotalCost = branchCosts[selectedBranchId];
+    effectiveTotalBudget = effectiveStudentCount * budgetPerChild;
+    effectiveBudgetDifference = effectiveTotalBudget - effectiveTotalCost;
+    effectiveCostPerChild = effectiveStudentCount > 0 ? effectiveTotalCost / effectiveStudentCount : 0;
+  } else if (selectedBranchId === 'all' && branches && branches.length > 0) {
+    const sumStudents = branches.reduce((sum, b) => sum + b.studentCount, 0);
+    if (sumStudents > 0) effectiveStudentCount = sumStudents;
+    const sumBranchCost = Object.values(branchCosts).reduce((sum, v) => sum + v, 0);
+    if (sumBranchCost > 0) effectiveTotalCost = sumBranchCost;
+    effectiveTotalBudget = effectiveStudentCount * budgetPerChild;
+    effectiveBudgetDifference = effectiveTotalBudget - effectiveTotalCost;
+    effectiveCostPerChild = effectiveStudentCount > 0 ? effectiveTotalCost / effectiveStudentCount : 0;
+  }
+
   return {
     computedItems,
     totals: {
-      studentCount,
+      studentCount: effectiveStudentCount,
       budgetPerChild,
-      totalBudget,
-      totalCost,
-      costPerChild,
-      budgetDifference,
+      totalBudget: effectiveTotalBudget,
+      totalCost: effectiveTotalCost,
+      costPerChild: effectiveCostPerChild,
+      budgetDifference: effectiveBudgetDifference,
       branchCosts,
       proteinAnimalG,
       proteinPlantG,

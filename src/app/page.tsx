@@ -325,7 +325,8 @@ export default function PMSDashboardPage() {
     currentPlan.studentCount,
     currentPlan.mealPricePerChild,
     currentPlan.ageGroup,
-    branches
+    branches,
+    selectedBranchId
   );
 
   // Chi phí thực tế theo Điểm trường đang chọn (Đ1, Đ2, hoặc Toàn trường)
@@ -696,28 +697,90 @@ export default function PMSDashboardPage() {
         let updatedMaugiao = bundle.maugiao;
         let updatedAnsang = bundle.ansang;
 
-        daysToApply.forEach((d) => {
-          const newItems: MenuItem[] = d.items.map((pi, idx) => {
-            const matched = pi.matchedFood || STANDARD_FOOD_CATALOG[0];
-            return {
-              id: `excel_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
-              foodId: matched.id,
-              food: matched,
-              mealSession: pi.mealSession,
-              gamPerChild: pi.gamPerChild > 0 ? pi.gamPerChild : 10,
-              dishName: pi.dishName || undefined,
-              isFixed: false,
-              customTotalBuy: pi.buyQuantity !== undefined && pi.buyQuantity > 0 ? pi.buyQuantity : undefined,
-            };
-          });
+    daysToApply.forEach((d) => {
+          const isAnsang = d.targetGroup === 'ansang' || d.sheetName?.toLowerCase().includes('sang');
+          const currentSubPlan = isAnsang ? updatedAnsang : updatedMaugiao;
 
-          const count = d.studentCount || (d.targetGroup === 'ansang' ? 385 : 380);
-          const price = d.pricePerChild || (d.targetGroup === 'ansang' ? 7000 : 21000);
+          // Lấy số trẻ hiện tại của từng cơ sở
+          const parts = branchInput.split(';').map((s) => parseInt(s.trim(), 10) || 0);
+          const b1Count = targetBranch === 'branch_1' && options?.studentCount ? options.studentCount : (parts[0] || 380);
+          const b2Count = targetBranch === 'branch_2' && options?.studentCount ? options.studentCount : (parts[1] || 135);
+          const totalCount = targetBranch === 'all' ? (d.studentCount || (isAnsang ? 385 : 380)) : (b1Count + b2Count);
+          const price = d.pricePerChild || (isAnsang ? 7000 : 21000);
 
-          if (d.targetGroup === 'ansang' || d.sheetName?.toLowerCase().includes('sang')) {
+          let newItems: MenuItem[];
+          // Nếu targetBranch !== 'all' và thực đơn hiện tại đã có món từ cơ sở khác
+          const hasExistingItems = currentSubPlan.items && currentSubPlan.items.length > 0;
+          if (targetBranch !== 'all' && hasExistingItems) {
+            const merged = [...currentSubPlan.items];
+            d.items.forEach((pi, idx) => {
+              const matched = pi.matchedFood || STANDARD_FOOD_CATALOG[0];
+              const pPrice = pi.price && pi.price > 0 ? pi.price : matched.price;
+              const buyQty = pi.buyQuantity !== undefined && pi.buyQuantity > 0 ? pi.buyQuantity : undefined;
+
+              const existIdx = merged.findIndex(
+                (it) =>
+                  (it.foodId === matched.id || it.food.name.toLowerCase().trim() === pi.foodName.toLowerCase().trim()) &&
+                  it.mealSession === pi.mealSession
+              );
+
+              if (existIdx >= 0) {
+                const cur = { ...merged[existIdx] };
+                const bQtys = { ...(cur.branchQuantities || {}) };
+                if (buyQty !== undefined) {
+                  bQtys[targetBranch] = buyQty;
+                }
+                cur.branchQuantities = bQtys;
+                const totalB = Object.values(bQtys).reduce((a, b) => a + b, 0);
+                cur.customTotalBuy = totalB > 0 ? Number(totalB.toFixed(2)) : cur.customTotalBuy;
+                cur.food = { ...cur.food, price: pPrice, contractPrice: pPrice };
+
+                if (totalCount > 0 && cur.customTotalBuy) {
+                  const waste = cur.food.wasteFactor || 0;
+                  const exchange = cur.food.gamExchange || 1000;
+                  const fBuyKg = (cur.customTotalBuy * exchange) / 1000;
+                  const fEatKg = fBuyKg * (1 - waste / 100);
+                  cur.gamPerChild = Math.round(((fEatKg * 1000) / totalCount) * 10) / 10;
+                }
+                merged[existIdx] = cur;
+              } else {
+                merged.push({
+                  id: `excel_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+                  foodId: matched.id,
+                  food: { ...matched, price: pPrice, contractPrice: pPrice },
+                  mealSession: pi.mealSession,
+                  gamPerChild: pi.gamPerChild > 0 ? pi.gamPerChild : 10,
+                  dishName: pi.dishName || undefined,
+                  isFixed: false,
+                  customTotalBuy: buyQty,
+                  branchQuantities: buyQty !== undefined ? { [targetBranch]: buyQty } : undefined,
+                });
+              }
+            });
+            newItems = merged;
+          } else {
+            newItems = d.items.map((pi, idx) => {
+              const matched = pi.matchedFood || STANDARD_FOOD_CATALOG[0];
+              const pPrice = pi.price && pi.price > 0 ? pi.price : matched.price;
+              const buyQty = pi.buyQuantity !== undefined && pi.buyQuantity > 0 ? pi.buyQuantity : undefined;
+              return {
+                id: `excel_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+                foodId: matched.id,
+                food: { ...matched, price: pPrice, contractPrice: pPrice },
+                mealSession: pi.mealSession,
+                gamPerChild: pi.gamPerChild > 0 ? pi.gamPerChild : 10,
+                dishName: pi.dishName || undefined,
+                isFixed: false,
+                customTotalBuy: buyQty,
+                branchQuantities: targetBranch !== 'all' && buyQty !== undefined ? { [targetBranch]: buyQty } : undefined,
+              };
+            });
+          }
+
+          if (isAnsang) {
             updatedAnsang = {
               ...updatedAnsang,
-              studentCount: count,
+              studentCount: totalCount,
               mealPricePerChild: price,
               menuCode: d.menuTitle.sang || 'Ăn sáng dinh dưỡng',
               items: newItems,
@@ -726,7 +789,7 @@ export default function PMSDashboardPage() {
           } else {
             updatedMaugiao = {
               ...updatedMaugiao,
-              studentCount: count,
+              studentCount: totalCount,
               mealPricePerChild: price,
               menuCode: d.menuTitle.trua || 'Thực đơn mầm non',
               menuTitle: {
@@ -1643,7 +1706,7 @@ export default function PMSDashboardPage() {
                 onSelectDate={(d) => setSelectedDate(d)}
                 currentSegment={currentSegment}
                 onSegmentChange={(seg) => setCurrentSegment(seg)}
-                studentCount={currentPlan.studentCount}
+                studentCount={totals.studentCount}
                 onStudentCountChange={(count) =>
                   updateCurrentPlan((p) => ({ ...p, studentCount: count }))
                 }
@@ -1682,7 +1745,7 @@ export default function PMSDashboardPage() {
                 onStatusChange={(s) => handleStatusChange(s)}
                 canApproveMenu={rolePerm.canApproveMenu}
                 canLockMenu={rolePerm.canLockMenu}
-                studentCount={currentPlan.studentCount}
+                studentCount={totals.studentCount}
                 onStudentCountChange={handleStudentCountChange}
                 onFetchAttendanceCount={handleFetchAttendanceCount}
                 selectedBranchId={selectedBranchId}
@@ -1697,7 +1760,7 @@ export default function PMSDashboardPage() {
                 serviceFee={currentPlan.serviceFee || 0}
                 subsidyFee={currentPlan.subsidyFee || 0}
                 initialDifference={currentPlan.initialDifference || 0}
-                totalCost={effectiveBranchCost}
+                totalCost={totals.totalCost}
                 onAddFood={() => setIsAddModalOpen(true)}
                 onCopyZalo={handleCopyZaloPO}
                 onSave={() => {
@@ -1745,6 +1808,7 @@ export default function PMSDashboardPage() {
                 items={computedItems}
                 totals={totals}
                 branches={branches}
+                selectedBranchId={selectedBranchId}
                 isLocked={isLocked}
                 canEditNutrients={rolePerm.canEditNutrients}
                 onUpdateGam={handleUpdateGam}

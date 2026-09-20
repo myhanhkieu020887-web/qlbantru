@@ -97,6 +97,7 @@ export interface ComputedMenuItem extends MenuItem {
   branchBuyUnits?: Record<string, number>;
   unitPrice: number;
   totalPrice: number;
+  branchPrice?: number;
   proteinAnimal: number;
   proteinPlant: number;
   fatAnimal: number;

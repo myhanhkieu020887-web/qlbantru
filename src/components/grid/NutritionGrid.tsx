@@ -28,6 +28,7 @@ interface Props {
   items: ComputedMenuItem[];
   totals: NutritionTotals;
   branches?: SchoolBranch[];
+  selectedBranchId?: string;
   isLocked?: boolean;
   canEditNutrients?: boolean;
   onUpdateGam: (itemId: string, newGam: number) => void;
@@ -60,6 +61,7 @@ export const NutritionGrid: React.FC<Props> = ({
   items,
   totals,
   branches = [],
+  selectedBranchId = 'all',
   isLocked = false,
   canEditNutrients = true,
   onUpdateGam,
@@ -128,6 +130,15 @@ export const NutritionGrid: React.FC<Props> = ({
     });
     dishes.push(...dishMap.values());
   }
+
+  // Hàm tính thành tiền của món theo điểm trường đang xem (Đ1, Đ2, hoặc Toàn trường)
+  const getItemCost = (it: ComputedMenuItem) => {
+    if (selectedBranchId && selectedBranchId !== 'all' && it.branchBuyUnits && it.branchBuyUnits[selectedBranchId] !== undefined) {
+      const effectivePrice = it.food.contractPrice && it.food.contractPrice > 0 ? it.food.contractPrice : it.food.price;
+      return (it.branchBuyUnits[selectedBranchId] ?? 0) * effectivePrice;
+    }
+    return it.branchPrice !== undefined && selectedBranchId !== 'all' ? it.branchPrice : it.totalPrice;
+  };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
@@ -324,7 +335,7 @@ export const NutritionGrid: React.FC<Props> = ({
                   label: 'Bữa ăn',
                   color: 'bg-slate-100 text-slate-800 border-slate-300',
                 };
-                const groupCost = group.items.reduce((sum, it) => sum + it.totalPrice, 0);
+                const groupCost = group.items.reduce((sum, it) => sum + getItemCost(it), 0);
                 const groupCalo = group.items.reduce((sum, it) => sum + it.calo, 0);
 
                 return (
@@ -526,7 +537,7 @@ export const NutritionGrid: React.FC<Props> = ({
                           )}
 
                           <td className="py-0.5 px-2 text-right border-r border-slate-200 font-mono font-bold text-slate-900 bg-amber-50/30 text-[11px]">
-                            {Math.round(it.totalPrice).toLocaleString('vi-VN')}
+                            {Math.round(getItemCost(it)).toLocaleString('vi-VN')}
                           </td>
 
                           {colConfig.showNutrients && (
@@ -690,7 +701,7 @@ export const NutritionGrid: React.FC<Props> = ({
                     )}
 
                     <td className="py-0.5 px-2 text-right border-r border-slate-200 font-mono font-bold text-slate-900 bg-amber-50/30 text-[11px]">
-                      {Math.round(it.totalPrice).toLocaleString('vi-VN')}
+                      {Math.round(getItemCost(it)).toLocaleString('vi-VN')}
                     </td>
 
                     {colConfig.showNutrients && (

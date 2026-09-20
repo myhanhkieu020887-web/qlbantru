@@ -262,10 +262,26 @@ function parseSchoolStandardSheet(
     }
 
     const rawGam = parseFloat(String(row[2] || '0').trim().replace(',', '.'));
-    const rawPrice = parseFloat(String(row[3] || '0').trim().replace(/,/g, ''));
+    const rawPriceKg = parseFloat(String(row[3] || '0').trim().replace(/,/g, ''));
     const rawWaste = parseFloat(String(row[5] || '0').trim().replace(',', '.'));
-    const rawBuy = parseFloat(String(row[6] || '0').trim().replace(',', '.'));
+    const rawBuyKg = parseFloat(String(row[6] || '0').trim().replace(',', '.'));
+    const rawBuyDVT = parseFloat(String(row[7] || '0').trim().replace(',', '.'));
     const rawUnit = String(row[8] || 'Kg').trim();
+    const rawUnitPriceDVT = parseFloat(String(row[10] || '0').trim().replace(/,/g, ''));
+
+    // Ưu tiên số lượng mua theo ĐVT (row[7]), nếu không có mới lấy rawBuyKg (row[6])
+    const finalBuyQuantity = !isNaN(rawBuyDVT) && rawBuyDVT > 0
+      ? rawBuyDVT
+      : !isNaN(rawBuyKg) && rawBuyKg > 0
+      ? rawBuyKg
+      : undefined;
+
+    // Ưu tiên đơn giá theo ĐVT (row[10]), nếu không có mới lấy đơn giá kg (row[3])
+    const finalPrice = !isNaN(rawUnitPriceDVT) && rawUnitPriceDVT > 0
+      ? rawUnitPriceDVT
+      : !isNaN(rawPriceKg) && rawPriceKg > 0
+      ? rawPriceKg
+      : undefined;
 
     // Xác định bữa ăn dựa vào loại thực phẩm hoặc phân hệ
     let session: MealSession = 'chinh_trua';
@@ -294,16 +310,25 @@ function parseSchoolStandardSheet(
     const matched = findBestMatchingFood(rawName);
     if (!matched) unmatched++;
 
+    const matchedWithPrice = matched
+      ? {
+          ...matched,
+          price: finalPrice || matched.price,
+          contractPrice: finalPrice || matched.contractPrice || matched.price,
+          unit: rawUnit || matched.unit,
+        }
+      : null;
+
     items.push({
       foodName: rawName,
-      matchedFood: matched,
+      matchedFood: matchedWithPrice,
       mealSession: session,
       gamPerChild: isNaN(rawGam) || rawGam < 0 ? 0 : rawGam,
       dishName: assignedDish,
       unit: rawUnit || matched?.unit || 'Kg',
-      price: !isNaN(rawPrice) && rawPrice > 0 ? rawPrice : matched?.price,
+      price: finalPrice || matched?.price,
       wasteFactor: !isNaN(rawWaste) ? rawWaste : matched?.wasteFactor,
-      buyQuantity: !isNaN(rawBuy) ? rawBuy : undefined,
+      buyQuantity: finalBuyQuantity,
       warning: matched ? undefined : 'Chưa khớp danh mục chuẩn Viện Dinh Dưỡng, dùng thông số mặc định',
     });
   }

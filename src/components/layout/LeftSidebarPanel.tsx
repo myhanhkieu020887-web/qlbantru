@@ -705,10 +705,18 @@ export const LeftSidebarPanel: React.FC<Props> = ({
             </span>
             <span
               className={`px-1.5 py-0.2 rounded font-bold text-[10px] ${
-                totals.budgetDifference >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                Math.round(totals.budgetDifference) === 0
+                  ? 'bg-blue-100 text-blue-800'
+                  : totals.budgetDifference > 0
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-rose-100 text-rose-800'
               }`}
             >
-              {totals.budgetDifference >= 0 ? 'DƯ QUỸ' : 'BỘI CHI'}
+              {Math.round(totals.budgetDifference) === 0
+                ? 'CÂN ĐỐI'
+                : totals.budgetDifference > 0
+                ? 'DƯ QUỸ'
+                : 'BỘI CHI'}
             </span>
           </div>
           <div className="flex items-baseline justify-between">
@@ -721,8 +729,17 @@ export const LeftSidebarPanel: React.FC<Props> = ({
           </div>
           <div className="text-[10px] text-slate-500 mt-1 flex items-center justify-between">
             <span>Chênh lệch ngân sách:</span>
-            <strong className={`font-mono ${totals.budgetDifference >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-              {formatCurrency(totals.budgetDifference)}
+            <strong
+              className={`font-mono ${
+                Math.round(totals.budgetDifference) === 0
+                  ? 'text-blue-700'
+                  : totals.budgetDifference > 0
+                  ? 'text-emerald-700'
+                  : 'text-rose-600'
+              }`}
+            >
+              {totals.budgetDifference > 0 ? '+' : ''}
+              {formatCurrency(Math.round(totals.budgetDifference))}
             </strong>
           </div>
         </div>
